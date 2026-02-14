@@ -4,7 +4,7 @@ import { store, Staff as StaffType } from "@/lib/store";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter } from "@/components/ui/sheet";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Search, Pencil, Trash2 } from "lucide-react";
@@ -17,15 +17,15 @@ const emptyStaff: Omit<StaffType, 'id'> = {
 const StaffPage = () => {
   const [staffList, setStaffList] = useState(store.getStaff());
   const [search, setSearch] = useState('');
-  const [dialogOpen, setDialogOpen] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState(emptyStaff);
 
   const save = (list: StaffType[]) => { setStaffList(list); store.setStaff(list); };
   const filtered = staffList.filter(s => s.name.toLowerCase().includes(search.toLowerCase()) || s.role.toLowerCase().includes(search.toLowerCase()));
 
-  const openNew = () => { setForm(emptyStaff); setEditId(null); setDialogOpen(true); };
-  const openEdit = (s: StaffType) => { setForm(s); setEditId(s.id); setDialogOpen(true); };
+  const openNew = () => { setForm(emptyStaff); setEditId(null); setSheetOpen(true); };
+  const openEdit = (s: StaffType) => { setForm(s); setEditId(s.id); setSheetOpen(true); };
 
   const handleSave = () => {
     if (!form.name) { toast.error('Name is required'); return; }
@@ -36,7 +36,7 @@ const StaffPage = () => {
       save([...staffList, { ...form, id: store.generateId() }]);
       toast.success('Staff added');
     }
-    setDialogOpen(false);
+    setSheetOpen(false);
   };
 
   const handleDelete = (id: string) => { save(staffList.filter(s => s.id !== id)); toast.success('Staff removed'); };
@@ -86,10 +86,10 @@ const StaffPage = () => {
         </Table>
       </div>
 
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader><DialogTitle>{editId ? 'Edit Staff' : 'Add Staff'}</DialogTitle></DialogHeader>
-          <div className="grid grid-cols-2 gap-3">
+      <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+        <SheetContent className="overflow-y-auto">
+          <SheetHeader><SheetTitle>{editId ? 'Edit Staff' : 'Add Staff'}</SheetTitle></SheetHeader>
+          <div className="grid grid-cols-2 gap-3 mt-6">
             <div className="col-span-2"><Label>Full Name *</Label><Input value={form.name} onChange={e => updateForm('name', e.target.value)} /></div>
             <div><Label>Employee ID</Label><Input value={form.employeeId} onChange={e => updateForm('employeeId', e.target.value)} /></div>
             <div><Label>Role</Label><Input value={form.role} onChange={e => updateForm('role', e.target.value)} /></div>
@@ -98,9 +98,9 @@ const StaffPage = () => {
             <div><Label>Phone</Label><Input value={form.phone} onChange={e => updateForm('phone', e.target.value)} /></div>
             <div><Label>Email</Label><Input value={form.email} onChange={e => updateForm('email', e.target.value)} /></div>
           </div>
-          <DialogFooter><Button onClick={handleSave}>{editId ? 'Update' : 'Add'} Staff</Button></DialogFooter>
-        </DialogContent>
-      </Dialog>
+          <SheetFooter className="mt-6"><Button onClick={handleSave} className="w-full">{editId ? 'Update' : 'Add'} Staff</Button></SheetFooter>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 };

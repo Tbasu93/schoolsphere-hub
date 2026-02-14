@@ -6,19 +6,22 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ArrowRight, CheckCircle2, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 
 const Promotion = () => {
   const classes = store.getClasses();
   const [students, setStudents] = useState(store.getStudents());
+  const examResults = store.getExamResults();
   const [fromClass, setFromClass] = useState('');
   const [toClass, setToClass] = useState('');
   const [promoted, setPromoted] = useState(false);
+  const [failedStudents, setFailedStudents] = useState<Set<string>>(new Set());
 
   const eligibleStudents = students.filter(s => s.className === fromClass && s.status === 'Active');
 
-  // Auto-suggest next class
   const getNextClass = (current: string) => {
     const idx = classes.findIndex(c => c.name === current);
     if (idx >= 0 && idx < classes.length - 1) return classes[idx + 1].name;
@@ -29,15 +32,36 @@ const Promotion = () => {
     setFromClass(val);
     setToClass(getNextClass(val));
     setPromoted(false);
+
+    // Auto-detect failed students from exam results
+    const classStudents = students.filter(s => s.className === val && s.status === 'Active');
+    const failed = new Set<string>();
+    classStudents.forEach(s => {
+      const studentResults = examResults.filter(r => r.studentId === s.id);
+      const hasFailed = studentResults.some(r => r.status === 'Fail');
+      if (hasFailed) failed.add(s.id);
+    });
+    setFailedStudents(failed);
+  };
+
+  const toggleFailed = (studentId: string) => {
+    setFailedStudents(prev => {
+      const next = new Set(prev);
+      if (next.has(studentId)) next.delete(studentId);
+      else next.add(studentId);
+      return next;
+    });
   };
 
   const handlePromote = () => {
     if (!fromClass || !toClass) { toast.error('Select both classes'); return; }
     if (fromClass === toClass) { toast.error('Source and destination class must be different'); return; }
-    if (eligibleStudents.length === 0) { toast.error('No students to promote'); return; }
+
+    const toPromote = eligibleStudents.filter(s => !failedStudents.has(s.id));
+    if (toPromote.length === 0) { toast.error('No students selected for promotion'); return; }
 
     const updatedStudents = students.map(s => {
-      if (s.className === fromClass && s.status === 'Active') {
+      if (s.className === fromClass && s.status === 'Active' && !failedStudents.has(s.id)) {
         const targetSections = classes.find(c => c.name === toClass)?.sections || ['A'];
         return { ...s, className: toClass, section: targetSections[0] };
       }
@@ -47,16 +71,20 @@ const Promotion = () => {
     setStudents(updatedStudents);
     store.setStudents(updatedStudents);
     setPromoted(true);
-    toast.success(`${eligibleStudents.length} students promoted from ${fromClass} to ${toClass}`);
+    const failedCount = failedStudents.size;
+    toast.success(`${toPromote.length} students promoted. ${failedCount > 0 ? `${failedCount} retained in ${fromClass}.` : ''}`);
   };
+
+  const promoteCount = eligibleStudents.filter(s => !failedStudents.has(s.id)).length;
+  const retainCount = eligibleStudents.filter(s => failedStudents.has(s.id)).length;
 
   return (
     <div>
-      <PageHeader title="One-Click Promotion" description="Promote all students from one class to the next" />
+      <PageHeader title="Student Promotion" description="Promote students with pass/fail selection" />
 
-      <Card className="max-w-xl">
+      <Card className="max-w-3xl">
         <CardHeader>
-          <CardTitle className="text-base font-heading">Student Promotion</CardTitle>
+          <CardTitle className="text-base font-heading">Class Promotion</CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="flex items-end gap-4">
@@ -77,20 +105,55 @@ const Promotion = () => {
             </div>
           </div>
 
-          {fromClass && (
-            <div className="rounded-lg bg-muted/50 p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <span className="text-sm font-medium">{eligibleStudents.length} active student{eligibleStudents.length !== 1 ? 's' : ''} in {fromClass}</span>
+          {fromClass && eligibleStudents.length > 0 && (
+            <>
+              <div className="flex gap-3 flex-wrap">
+                <Badge variant="default">{promoteCount} to promote</Badge>
+                {retainCount > 0 && <Badge variant="destructive">{retainCount} retained (failed)</Badge>}
+                <Badge variant="secondary">{eligibleStudents.length} total</Badge>
               </div>
-              {eligibleStudents.length > 0 && (
-                <div className="flex flex-wrap gap-1.5 mb-3">
-                  {eligibleStudents.slice(0, 10).map(s => (
-                    <Badge key={s.id} variant="secondary" className="text-xs">{s.name}</Badge>
-                  ))}
-                  {eligibleStudents.length > 10 && <Badge variant="outline" className="text-xs">+{eligibleStudents.length - 10} more</Badge>}
-                </div>
-              )}
-            </div>
+
+              <div className="rounded-lg border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-12">Failed</TableHead>
+                      <TableHead>Roll No</TableHead>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Section</TableHead>
+                      <TableHead>Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {eligibleStudents.map(s => {
+                      const isFailed = failedStudents.has(s.id);
+                      return (
+                        <TableRow key={s.id} className={isFailed ? 'bg-destructive/5' : ''}>
+                          <TableCell>
+                            <Checkbox
+                              checked={isFailed}
+                              onCheckedChange={() => toggleFailed(s.id)}
+                            />
+                          </TableCell>
+                          <TableCell>{s.rollNo}</TableCell>
+                          <TableCell className="font-medium">{s.name}</TableCell>
+                          <TableCell>{s.section}</TableCell>
+                          <TableCell>
+                            <Badge variant={isFailed ? 'destructive' : 'default'} className="text-[10px]">
+                              {isFailed ? 'Retained' : 'Promote'}
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
+          )}
+
+          {fromClass && eligibleStudents.length === 0 && (
+            <p className="text-center text-muted-foreground py-4">No active students in {fromClass}</p>
           )}
 
           {promoted ? (
@@ -100,16 +163,17 @@ const Promotion = () => {
             </div>
           ) : (
             <div className="space-y-3">
-              {fromClass && toClass && eligibleStudents.length > 0 && (
+              {fromClass && toClass && promoteCount > 0 && (
                 <div className="flex items-start gap-2 p-3 rounded-lg border border-accent/30 bg-accent/5">
                   <AlertTriangle className="h-4 w-4 text-accent mt-0.5" />
                   <p className="text-xs text-muted-foreground">
-                    This will promote all {eligibleStudents.length} active students from <strong>{fromClass}</strong> to <strong>{toClass}</strong>. Students will be placed in the first available section.
+                    This will promote <strong>{promoteCount}</strong> students from <strong>{fromClass}</strong> to <strong>{toClass}</strong>.
+                    {retainCount > 0 && <> <strong>{retainCount}</strong> student(s) marked as failed will remain in <strong>{fromClass}</strong>.</>}
                   </p>
                 </div>
               )}
-              <Button onClick={handlePromote} disabled={!fromClass || !toClass || eligibleStudents.length === 0} className="w-full">
-                Promote {eligibleStudents.length} Student{eligibleStudents.length !== 1 ? 's' : ''}
+              <Button onClick={handlePromote} disabled={!fromClass || !toClass || promoteCount === 0} className="w-full">
+                Promote {promoteCount} Student{promoteCount !== 1 ? 's' : ''}
               </Button>
             </div>
           )}

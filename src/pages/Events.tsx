@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter } from "@/components/ui/sheet";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
@@ -22,7 +22,7 @@ const typeColors: Record<string, string> = {
 
 const Events = () => {
   const [events, setEvents] = useState(store.getEvents());
-  const [dialogOpen, setDialogOpen] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState(emptyEvent);
   const [filterType, setFilterType] = useState('All');
@@ -30,8 +30,8 @@ const Events = () => {
   const save = (list: Event[]) => { setEvents(list); store.setEvents(list); };
   const filtered = events.filter(e => filterType === 'All' || e.type === filterType).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-  const openNew = () => { setForm(emptyEvent); setEditId(null); setDialogOpen(true); };
-  const openEdit = (e: Event) => { setForm(e); setEditId(e.id); setDialogOpen(true); };
+  const openNew = () => { setForm(emptyEvent); setEditId(null); setSheetOpen(true); };
+  const openEdit = (e: Event) => { setForm(e); setEditId(e.id); setSheetOpen(true); };
 
   const handleSave = () => {
     if (!form.title || !form.date) { toast.error('Title and date are required'); return; }
@@ -42,7 +42,7 @@ const Events = () => {
       save([...events, { ...form, id: store.generateId() }]);
       toast.success('Event added');
     }
-    setDialogOpen(false);
+    setSheetOpen(false);
   };
 
   const handleDelete = (id: string) => { save(events.filter(e => e.id !== id)); toast.success('Event removed'); };
@@ -80,10 +80,10 @@ const Events = () => {
         ))}
       </div>
 
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader><DialogTitle>{editId ? 'Edit Event' : 'Add Event'}</DialogTitle></DialogHeader>
-          <div className="space-y-3">
+      <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+        <SheetContent>
+          <SheetHeader><SheetTitle>{editId ? 'Edit Event' : 'Add Event'}</SheetTitle></SheetHeader>
+          <div className="space-y-3 mt-6">
             <div><Label>Title *</Label><Input value={form.title} onChange={e => updateForm('title', e.target.value)} /></div>
             <div><Label>Date *</Label><Input type="date" value={form.date} onChange={e => updateForm('date', e.target.value)} /></div>
             <div>
@@ -95,9 +95,9 @@ const Events = () => {
             </div>
             <div><Label>Description</Label><Textarea value={form.description} onChange={e => updateForm('description', e.target.value)} rows={3} /></div>
           </div>
-          <DialogFooter><Button onClick={handleSave}>{editId ? 'Update' : 'Add'} Event</Button></DialogFooter>
-        </DialogContent>
-      </Dialog>
+          <SheetFooter className="mt-6"><Button onClick={handleSave} className="w-full">{editId ? 'Update' : 'Add'} Event</Button></SheetFooter>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 };

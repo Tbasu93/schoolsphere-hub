@@ -4,7 +4,7 @@ import { store, ClassConfig } from "@/lib/store";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter } from "@/components/ui/sheet";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Pencil, Trash2, X } from "lucide-react";
@@ -12,7 +12,7 @@ import { toast } from "sonner";
 
 const Classes = () => {
   const [classes, setClasses] = useState(store.getClasses());
-  const [dialogOpen, setDialogOpen] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [name, setName] = useState('');
   const [sections, setSections] = useState<string[]>(['A']);
@@ -20,8 +20,8 @@ const Classes = () => {
 
   const save = (list: ClassConfig[]) => { setClasses(list); store.setClasses(list); };
 
-  const openNew = () => { setName(''); setSections(['A']); setEditId(null); setDialogOpen(true); };
-  const openEdit = (c: ClassConfig) => { setName(c.name); setSections(c.sections); setEditId(c.id); setDialogOpen(true); };
+  const openNew = () => { setName(''); setSections(['A']); setEditId(null); setSheetOpen(true); };
+  const openEdit = (c: ClassConfig) => { setName(c.name); setSections(c.sections); setEditId(c.id); setSheetOpen(true); };
 
   const addSection = () => {
     const s = newSection.trim().toUpperCase();
@@ -37,7 +37,7 @@ const Classes = () => {
       save([...classes, { id: store.generateId(), name, sections }]);
       toast.success('Class added');
     }
-    setDialogOpen(false);
+    setSheetOpen(false);
   };
 
   const handleDelete = (id: string) => { save(classes.filter(c => c.id !== id)); toast.success('Class removed'); };
@@ -67,10 +67,10 @@ const Classes = () => {
         ))}
       </div>
 
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader><DialogTitle>{editId ? 'Edit Class' : 'Add Class'}</DialogTitle></DialogHeader>
-          <div className="space-y-4">
+      <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+        <SheetContent>
+          <SheetHeader><SheetTitle>{editId ? 'Edit Class' : 'Add Class'}</SheetTitle></SheetHeader>
+          <div className="space-y-4 mt-6">
             <div><Label>Class Name *</Label><Input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Class 1" /></div>
             <div>
               <Label>Sections</Label>
@@ -88,9 +88,9 @@ const Classes = () => {
               </div>
             </div>
           </div>
-          <DialogFooter><Button onClick={handleSave}>{editId ? 'Update' : 'Add'} Class</Button></DialogFooter>
-        </DialogContent>
-      </Dialog>
+          <SheetFooter className="mt-6"><Button onClick={handleSave} className="w-full">{editId ? 'Update' : 'Add'} Class</Button></SheetFooter>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 };

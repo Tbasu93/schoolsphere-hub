@@ -56,6 +56,19 @@ export interface FeeStructure {
   frequency: 'Monthly' | 'Quarterly' | 'Annually' | 'One-time';
 }
 
+export interface FeePayment {
+  id: string;
+  studentId: string;
+  studentName: string;
+  className: string;
+  feeType: string;
+  amount: number;
+  paidAmount: number;
+  paidDate: string;
+  status: 'Paid' | 'Partial' | 'Unpaid';
+  receiptNo: string;
+}
+
 export interface Event {
   id: string;
   title: string;
@@ -73,8 +86,50 @@ export interface Notice {
   priority: 'Normal' | 'Important' | 'Urgent';
 }
 
+export interface AttendanceRecord {
+  id: string;
+  date: string;
+  className: string;
+  section: string;
+  records: { studentId: string; studentName: string; status: 'Present' | 'Absent' | 'Late' }[];
+}
+
+export interface Exam {
+  id: string;
+  name: string;
+  className: string;
+  date: string;
+  subjects: string[];
+  maxMarks: number;
+  passMarks: number;
+}
+
+export interface ExamResult {
+  id: string;
+  examId: string;
+  studentId: string;
+  studentName: string;
+  className: string;
+  marks: { subject: string; obtained: number; max: number }[];
+  totalObtained: number;
+  totalMax: number;
+  percentage: number;
+  grade: string;
+  status: 'Pass' | 'Fail';
+}
+
 function generateId() {
   return Math.random().toString(36).substring(2, 10);
+}
+
+export function calculateGrade(percentage: number): string {
+  if (percentage >= 90) return 'A+';
+  if (percentage >= 80) return 'A';
+  if (percentage >= 70) return 'B+';
+  if (percentage >= 60) return 'B';
+  if (percentage >= 50) return 'C';
+  if (percentage >= 40) return 'D';
+  return 'F';
 }
 
 // Seed data
@@ -165,11 +220,23 @@ export const store = {
   getFees: (): FeeStructure[] => load('fees', sampleFees),
   setFees: (f: FeeStructure[]) => save('fees', f),
 
+  getFeePayments: (): FeePayment[] => load('feePayments', []),
+  setFeePayments: (p: FeePayment[]) => save('feePayments', p),
+
   getEvents: (): Event[] => load('events', sampleEvents),
   setEvents: (e: Event[]) => save('events', e),
 
   getNotices: (): Notice[] => load('notices', sampleNotices),
   setNotices: (n: Notice[]) => save('notices', n),
+
+  getAttendance: (): AttendanceRecord[] => load('attendance', []),
+  setAttendance: (a: AttendanceRecord[]) => save('attendance', a),
+
+  getExams: (): Exam[] => load('exams', []),
+  setExams: (e: Exam[]) => save('exams', e),
+
+  getExamResults: (): ExamResult[] => load('examResults', []),
+  setExamResults: (r: ExamResult[]) => save('examResults', r),
 
   generateId,
 };

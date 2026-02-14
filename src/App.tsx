@@ -10,9 +10,12 @@ import Teachers from "./pages/Teachers";
 import StaffPage from "./pages/StaffPage";
 import Classes from "./pages/Classes";
 import Fees from "./pages/Fees";
+import FeeCollection from "./pages/FeeCollection";
 import Events from "./pages/Events";
 import Notices from "./pages/Notices";
 import Promotion from "./pages/Promotion";
+import Attendance from "./pages/Attendance";
+import Exams from "./pages/Exams";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -29,8 +32,11 @@ const App = () => (
             <Route path="/students" element={<Students />} />
             <Route path="/teachers" element={<Teachers />} />
             <Route path="/staff" element={<StaffPage />} />
+            <Route path="/attendance" element={<Attendance />} />
+            <Route path="/exams" element={<Exams />} />
             <Route path="/classes" element={<Classes />} />
             <Route path="/fees" element={<Fees />} />
+            <Route path="/fee-collection" element={<FeeCollection />} />
             <Route path="/events" element={<Events />} />
             <Route path="/notices" element={<Notices />} />
             <Route path="/promotion" element={<Promotion />} />
