@@ -4,7 +4,7 @@ import { store, Student } from "@/lib/store";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter } from "@/components/ui/sheet";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
@@ -20,7 +20,7 @@ const Students = () => {
   const [students, setStudents] = useState(store.getStudents());
   const [search, setSearch] = useState('');
   const [filterClass, setFilterClass] = useState('All');
-  const [dialogOpen, setDialogOpen] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState(emptyStudent);
   const classes = store.getClasses();
@@ -33,8 +33,8 @@ const Students = () => {
     return matchSearch && matchClass;
   });
 
-  const openNew = () => { setForm(emptyStudent); setEditId(null); setDialogOpen(true); };
-  const openEdit = (s: Student) => { setForm(s); setEditId(s.id); setDialogOpen(true); };
+  const openNew = () => { setForm(emptyStudent); setEditId(null); setSheetOpen(true); };
+  const openEdit = (s: Student) => { setForm(s); setEditId(s.id); setSheetOpen(true); };
 
   const handleSave = () => {
     if (!form.name || !form.className) { toast.error('Name and Class are required'); return; }
@@ -45,7 +45,7 @@ const Students = () => {
       save([...students, { ...form, id: store.generateId() }]);
       toast.success('Student added');
     }
-    setDialogOpen(false);
+    setSheetOpen(false);
   };
 
   const handleDelete = (id: string) => {
@@ -54,7 +54,6 @@ const Students = () => {
   };
 
   const updateForm = (key: string, value: string) => setForm(prev => ({ ...prev, [key]: value }));
-
   const selectedClassSections = classes.find(c => c.name === form.className)?.sections || [];
 
   return (
@@ -116,10 +115,10 @@ const Students = () => {
         </Table>
       </div>
 
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
-          <DialogHeader><DialogTitle>{editId ? 'Edit Student' : 'Add Student'}</DialogTitle></DialogHeader>
-          <div className="grid grid-cols-2 gap-3">
+      <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+        <SheetContent className="overflow-y-auto">
+          <SheetHeader><SheetTitle>{editId ? 'Edit Student' : 'Add Student'}</SheetTitle></SheetHeader>
+          <div className="grid grid-cols-2 gap-3 mt-6">
             <div className="col-span-2"><Label>Full Name *</Label><Input value={form.name} onChange={e => updateForm('name', e.target.value)} /></div>
             <div><Label>Roll No</Label><Input value={form.rollNo} onChange={e => updateForm('rollNo', e.target.value)} /></div>
             <div>
@@ -149,10 +148,17 @@ const Students = () => {
             <div><Label>Phone</Label><Input value={form.phone} onChange={e => updateForm('phone', e.target.value)} /></div>
             <div><Label>Email</Label><Input value={form.email} onChange={e => updateForm('email', e.target.value)} /></div>
             <div className="col-span-2"><Label>Address</Label><Input value={form.address} onChange={e => updateForm('address', e.target.value)} /></div>
+            <div>
+              <Label>Status</Label>
+              <Select value={form.status} onValueChange={v => updateForm('status', v)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent><SelectItem value="Active">Active</SelectItem><SelectItem value="Inactive">Inactive</SelectItem></SelectContent>
+              </Select>
+            </div>
           </div>
-          <DialogFooter><Button onClick={handleSave}>{editId ? 'Update' : 'Add'} Student</Button></DialogFooter>
-        </DialogContent>
-      </Dialog>
+          <SheetFooter className="mt-6"><Button onClick={handleSave} className="w-full">{editId ? 'Update' : 'Add'} Student</Button></SheetFooter>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 };

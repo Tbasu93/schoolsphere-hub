@@ -8,6 +8,9 @@ import {
   CalendarDays,
   Megaphone,
   ArrowUpCircle,
+  ClipboardCheck,
+  Receipt,
+  FileText,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import {
@@ -27,14 +30,30 @@ const mainNav = [
   { title: "Students", url: "/students", icon: GraduationCap },
   { title: "Teachers", url: "/teachers", icon: Users },
   { title: "Staff", url: "/staff", icon: UserCog },
+  { title: "Attendance", url: "/attendance", icon: ClipboardCheck },
+];
+
+const academicNav = [
+  { title: "Examinations", url: "/exams", icon: FileText },
+  { title: "Promotion", url: "/promotion", icon: ArrowUpCircle },
+];
+
+const financeNav = [
+  { title: "Fee Structure", url: "/fees", icon: IndianRupee },
+  { title: "Fee Collection", url: "/fee-collection", icon: Receipt },
 ];
 
 const configNav = [
   { title: "Classes & Sections", url: "/classes", icon: School },
-  { title: "Fee Management", url: "/fees", icon: IndianRupee },
   { title: "Events & Holidays", url: "/events", icon: CalendarDays },
   { title: "Notices", url: "/notices", icon: Megaphone },
-  { title: "Promotion", url: "/promotion", icon: ArrowUpCircle },
+];
+
+const navGroups = [
+  { label: "Main", items: mainNav },
+  { label: "Academics", items: academicNav },
+  { label: "Finance", items: financeNav },
+  { label: "Configure", items: configNav },
 ];
 
 export function AppSidebar() {
@@ -57,54 +76,32 @@ export function AppSidebar() {
       </SidebarHeader>
 
       <SidebarContent className="px-2">
-        <SidebarGroup>
-          <SidebarGroupLabel className="text-sidebar-foreground/40 text-[10px] uppercase tracking-wider font-medium">
-            Main
-          </SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {mainNav.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild>
-                    <NavLink
-                      to={item.url}
-                      end={item.url === "/"}
-                      className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-sidebar-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                      activeClassName="bg-sidebar-accent text-sidebar-primary font-medium"
-                    >
-                      <item.icon className="h-4 w-4" />
-                      <span>{item.title}</span>
-                    </NavLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-
-        <SidebarGroup>
-          <SidebarGroupLabel className="text-sidebar-foreground/40 text-[10px] uppercase tracking-wider font-medium">
-            Configure
-          </SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {configNav.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild>
-                    <NavLink
-                      to={item.url}
-                      className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-sidebar-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                      activeClassName="bg-sidebar-accent text-sidebar-primary font-medium"
-                    >
-                      <item.icon className="h-4 w-4" />
-                      <span>{item.title}</span>
-                    </NavLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        {navGroups.map(group => (
+          <SidebarGroup key={group.label}>
+            <SidebarGroupLabel className="text-sidebar-foreground/40 text-[10px] uppercase tracking-wider font-medium">
+              {group.label}
+            </SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {group.items.map((item) => (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton asChild>
+                      <NavLink
+                        to={item.url}
+                        end={item.url === "/"}
+                        className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-sidebar-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                        activeClassName="bg-sidebar-accent text-sidebar-primary font-medium"
+                      >
+                        <item.icon className="h-4 w-4" />
+                        <span>{item.title}</span>
+                      </NavLink>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        ))}
       </SidebarContent>
     </Sidebar>
   );

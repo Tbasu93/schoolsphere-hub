@@ -4,7 +4,7 @@ import { store, FeeStructure } from "@/lib/store";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter } from "@/components/ui/sheet";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Pencil, Trash2 } from "lucide-react";
@@ -16,15 +16,15 @@ const emptyFee: Omit<FeeStructure, 'id'> = {
 
 const Fees = () => {
   const [fees, setFees] = useState(store.getFees());
-  const [dialogOpen, setDialogOpen] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState(emptyFee);
   const classes = store.getClasses();
 
   const save = (list: FeeStructure[]) => { setFees(list); store.setFees(list); };
 
-  const openNew = () => { setForm(emptyFee); setEditId(null); setDialogOpen(true); };
-  const openEdit = (f: FeeStructure) => { setForm(f); setEditId(f.id); setDialogOpen(true); };
+  const openNew = () => { setForm(emptyFee); setEditId(null); setSheetOpen(true); };
+  const openEdit = (f: FeeStructure) => { setForm(f); setEditId(f.id); setSheetOpen(true); };
 
   const handleSave = () => {
     if (!form.feeType || !form.className) { toast.error('Fee type and class are required'); return; }
@@ -35,7 +35,7 @@ const Fees = () => {
       save([...fees, { ...form, id: store.generateId() }]);
       toast.success('Fee added');
     }
-    setDialogOpen(false);
+    setSheetOpen(false);
   };
 
   const handleDelete = (id: string) => { save(fees.filter(f => f.id !== id)); toast.success('Fee removed'); };
@@ -78,10 +78,10 @@ const Fees = () => {
         </Table>
       </div>
 
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader><DialogTitle>{editId ? 'Edit Fee' : 'Add Fee'}</DialogTitle></DialogHeader>
-          <div className="space-y-3">
+      <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+        <SheetContent>
+          <SheetHeader><SheetTitle>{editId ? 'Edit Fee' : 'Add Fee'}</SheetTitle></SheetHeader>
+          <div className="space-y-3 mt-6">
             <div><Label>Fee Type *</Label><Input value={form.feeType} onChange={e => updateForm('feeType', e.target.value)} placeholder="e.g. Tuition Fee" /></div>
             <div>
               <Label>Class *</Label>
@@ -108,9 +108,9 @@ const Fees = () => {
             </div>
             <div><Label>Due Date</Label><Input type="date" value={form.dueDate} onChange={e => updateForm('dueDate', e.target.value)} /></div>
           </div>
-          <DialogFooter><Button onClick={handleSave}>{editId ? 'Update' : 'Add'} Fee</Button></DialogFooter>
-        </DialogContent>
-      </Dialog>
+          <SheetFooter className="mt-6"><Button onClick={handleSave} className="w-full">{editId ? 'Update' : 'Add'} Fee</Button></SheetFooter>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 };
