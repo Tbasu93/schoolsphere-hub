@@ -131,6 +131,20 @@ export interface RoutinePeriod {
   teacherName: string;
 }
 
+export interface PromotionPolicy {
+  minPercentage: number;
+  minAttendancePercent: number;
+  requireAllSubjectsPass: boolean;
+  minSubjectsPass: number;
+}
+
+const defaultPromotionPolicy: PromotionPolicy = {
+  minPercentage: 40,
+  minAttendancePercent: 75,
+  requireAllSubjectsPass: false,
+  minSubjectsPass: 0,
+};
+
 function generateId() {
   return Math.random().toString(36).substring(2, 10);
 }
@@ -253,6 +267,9 @@ export const store = {
 
   getRoutine: (): RoutinePeriod[] => load('routine', []),
   setRoutine: (r: RoutinePeriod[]) => save('routine', r),
+
+  getPromotionPolicy: (): PromotionPolicy => load('promotionPolicy', defaultPromotionPolicy),
+  setPromotionPolicy: (p: PromotionPolicy) => save('promotionPolicy', p),
 
   generateId,
 };

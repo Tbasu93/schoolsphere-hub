@@ -14,6 +14,7 @@ import FeeCollection from "./pages/FeeCollection";
 import Events from "./pages/Events";
 import Notices from "./pages/Notices";
 import Promotion from "./pages/Promotion";
+import PromotionPolicy from "./pages/PromotionPolicy";
 import Attendance from "./pages/Attendance";
 import Exams from "./pages/Exams";
 import Routine from "./pages/Routine";
@@ -42,6 +43,7 @@ const App = () => (
             <Route path="/events" element={<Events />} />
             <Route path="/notices" element={<Notices />} />
             <Route path="/promotion" element={<Promotion />} />
+            <Route path="/promotion-policy" element={<PromotionPolicy />} />
           </Route>
           <Route path="*" element={<NotFound />} />
         </Routes>
