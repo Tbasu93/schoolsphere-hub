@@ -12,6 +12,7 @@ import {
   Receipt,
   FileText,
   CalendarClock,
+  SlidersHorizontal,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import {
@@ -47,6 +48,7 @@ const financeNav = [
 
 const configNav = [
   { title: "Classes & Sections", url: "/classes", icon: School },
+  { title: "Promotion Policy", url: "/promotion-policy", icon: SlidersHorizontal },
   { title: "Events & Holidays", url: "/events", icon: CalendarDays },
   { title: "Notices", url: "/notices", icon: Megaphone },
 ];

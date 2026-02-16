@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { PageHeader } from "@/components/PageHeader";
 import { store } from "@/lib/store";
 import { Button } from "@/components/ui/button";
@@ -6,19 +6,28 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowRight, CheckCircle2, AlertTriangle } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ArrowRight, CheckCircle2, AlertTriangle, ShieldAlert } from "lucide-react";
 import { toast } from "sonner";
+
+interface EligibilityInfo {
+  eligible: boolean;
+  reasons: string[];
+  percentage: number | null;
+  attendancePercent: number | null;
+}
 
 const Promotion = () => {
   const classes = store.getClasses();
   const [students, setStudents] = useState(store.getStudents());
   const examResults = store.getExamResults();
+  const attendanceRecords = store.getAttendance();
+  const policy = store.getPromotionPolicy();
   const [fromClass, setFromClass] = useState('');
   const [toClass, setToClass] = useState('');
   const [promoted, setPromoted] = useState(false);
-  const [failedStudents, setFailedStudents] = useState<Set<string>>(new Set());
+  const [forcePromoteStudent, setForcePromoteStudent] = useState<string | null>(null);
 
   const eligibleStudents = students.filter(s => s.className === fromClass && s.status === 'Active');
 
@@ -28,40 +37,114 @@ const Promotion = () => {
     return '';
   };
 
+  // Compute eligibility for each student based on policy
+  const eligibilityMap = useMemo(() => {
+    const map = new Map<string, EligibilityInfo>();
+    eligibleStudents.forEach(s => {
+      const reasons: string[] = [];
+      let eligible = true;
+
+      // Check exam results
+      const studentResults = examResults.filter(r => r.studentId === s.id);
+      let percentage: number | null = null;
+      if (studentResults.length > 0) {
+        const latest = studentResults[studentResults.length - 1];
+        percentage = latest.percentage;
+
+        if (percentage < policy.minPercentage) {
+          eligible = false;
+          reasons.push(`Percentage ${percentage.toFixed(1)}% < ${policy.minPercentage}%`);
+        }
+
+        if (policy.requireAllSubjectsPass) {
+          const failedSubjects = latest.marks.filter(m => m.obtained < (m.max * policy.minPercentage / 100));
+          if (failedSubjects.length > 0) {
+            eligible = false;
+            reasons.push(`Failed ${failedSubjects.length} subject(s)`);
+          }
+        } else if (policy.minSubjectsPass > 0) {
+          const passedSubjects = latest.marks.filter(m => m.obtained >= (m.max * policy.minPercentage / 100)).length;
+          if (passedSubjects < policy.minSubjectsPass) {
+            eligible = false;
+            reasons.push(`Passed ${passedSubjects}/${policy.minSubjectsPass} required subjects`);
+          }
+        }
+
+        if (latest.status === 'Fail') {
+          if (!reasons.length) {
+            eligible = false;
+            reasons.push('Exam status: Fail');
+          }
+        }
+      }
+
+      // Check attendance
+      let attendancePercent: number | null = null;
+      const studentAttendance = attendanceRecords.flatMap(a =>
+        a.records.filter(r => r.studentId === s.id).map(r => r.status)
+      );
+      if (studentAttendance.length > 0) {
+        const present = studentAttendance.filter(st => st === 'Present' || st === 'Late').length;
+        attendancePercent = (present / studentAttendance.length) * 100;
+        if (attendancePercent < policy.minAttendancePercent) {
+          eligible = false;
+          reasons.push(`Attendance ${attendancePercent.toFixed(1)}% < ${policy.minAttendancePercent}%`);
+        }
+      }
+
+      map.set(s.id, { eligible, reasons, percentage, attendancePercent });
+    });
+    return map;
+  }, [eligibleStudents, examResults, attendanceRecords, policy]);
+
+  // Track force-promoted students (ineligible but admin approved)
+  const [forcePromoted, setForcePromoted] = useState<Set<string>>(new Set());
+
   const handleFromChange = (val: string) => {
     setFromClass(val);
     setToClass(getNextClass(val));
     setPromoted(false);
-
-    // Auto-detect failed students from exam results
-    const classStudents = students.filter(s => s.className === val && s.status === 'Active');
-    const failed = new Set<string>();
-    classStudents.forEach(s => {
-      const studentResults = examResults.filter(r => r.studentId === s.id);
-      const hasFailed = studentResults.some(r => r.status === 'Fail');
-      if (hasFailed) failed.add(s.id);
-    });
-    setFailedStudents(failed);
+    setForcePromoted(new Set());
   };
 
-  const toggleFailed = (studentId: string) => {
-    setFailedStudents(prev => {
+  const handleForcePromoteConfirm = () => {
+    if (forcePromoteStudent) {
+      setForcePromoted(prev => new Set(prev).add(forcePromoteStudent));
+      const student = eligibleStudents.find(s => s.id === forcePromoteStudent);
+      toast.success(`${student?.name} will be promoted on consideration`);
+    }
+    setForcePromoteStudent(null);
+  };
+
+  const handleUndoForce = (studentId: string) => {
+    setForcePromoted(prev => {
       const next = new Set(prev);
-      if (next.has(studentId)) next.delete(studentId);
-      else next.add(studentId);
+      next.delete(studentId);
       return next;
     });
   };
 
+  const getEffectiveStatus = (studentId: string) => {
+    const info = eligibilityMap.get(studentId);
+    if (!info) return 'eligible';
+    if (info.eligible) return 'eligible';
+    if (forcePromoted.has(studentId)) return 'force-promoted';
+    return 'not-eligible';
+  };
+
+  const studentsToPromote = eligibleStudents.filter(s => {
+    const status = getEffectiveStatus(s.id);
+    return status === 'eligible' || status === 'force-promoted';
+  });
+
   const handlePromote = () => {
     if (!fromClass || !toClass) { toast.error('Select both classes'); return; }
-    if (fromClass === toClass) { toast.error('Source and destination class must be different'); return; }
+    if (fromClass === toClass) { toast.error('Source and destination must differ'); return; }
+    if (studentsToPromote.length === 0) { toast.error('No students to promote'); return; }
 
-    const toPromote = eligibleStudents.filter(s => !failedStudents.has(s.id));
-    if (toPromote.length === 0) { toast.error('No students selected for promotion'); return; }
-
+    const promoteIds = new Set(studentsToPromote.map(s => s.id));
     const updatedStudents = students.map(s => {
-      if (s.className === fromClass && s.status === 'Active' && !failedStudents.has(s.id)) {
+      if (promoteIds.has(s.id)) {
         const targetSections = classes.find(c => c.name === toClass)?.sections || ['A'];
         return { ...s, className: toClass, section: targetSections[0] };
       }
@@ -71,18 +154,23 @@ const Promotion = () => {
     setStudents(updatedStudents);
     store.setStudents(updatedStudents);
     setPromoted(true);
-    const failedCount = failedStudents.size;
-    toast.success(`${toPromote.length} students promoted. ${failedCount > 0 ? `${failedCount} retained in ${fromClass}.` : ''}`);
+    const retainCount = eligibleStudents.length - studentsToPromote.length;
+    const forceCount = forcePromoted.size;
+    toast.success(
+      `${studentsToPromote.length} students promoted${forceCount > 0 ? ` (${forceCount} on consideration)` : ''}. ${retainCount > 0 ? `${retainCount} retained.` : ''}`
+    );
   };
 
-  const promoteCount = eligibleStudents.filter(s => !failedStudents.has(s.id)).length;
-  const retainCount = eligibleStudents.filter(s => failedStudents.has(s.id)).length;
+  const promoteCount = studentsToPromote.length;
+  const retainCount = eligibleStudents.length - promoteCount;
+  const forcePromoteStudentData = eligibleStudents.find(s => s.id === forcePromoteStudent);
+  const forcePromoteInfo = forcePromoteStudent ? eligibilityMap.get(forcePromoteStudent) : null;
 
   return (
     <div>
-      <PageHeader title="Student Promotion" description="Promote students with pass/fail selection" />
+      <PageHeader title="Student Promotion" description="Auto-eligibility based on promotion policy. Force-promote with confirmation." />
 
-      <Card className="max-w-3xl">
+      <Card className="max-w-4xl">
         <CardHeader>
           <CardTitle className="text-base font-heading">Class Promotion</CardTitle>
         </CardHeader>
@@ -105,11 +193,21 @@ const Promotion = () => {
             </div>
           </div>
 
+          {/* Policy summary */}
+          <div className="flex gap-2 flex-wrap text-xs">
+            <Badge variant="outline">Min {policy.minPercentage}%</Badge>
+            <Badge variant="outline">Min Attendance {policy.minAttendancePercent}%</Badge>
+            {policy.requireAllSubjectsPass && <Badge variant="outline">All Subjects Pass</Badge>}
+            {!policy.requireAllSubjectsPass && policy.minSubjectsPass > 0 && (
+              <Badge variant="outline">Min {policy.minSubjectsPass} Subjects Pass</Badge>
+            )}
+          </div>
+
           {fromClass && eligibleStudents.length > 0 && (
             <>
               <div className="flex gap-3 flex-wrap">
                 <Badge variant="default">{promoteCount} to promote</Badge>
-                {retainCount > 0 && <Badge variant="destructive">{retainCount} retained (failed)</Badge>}
+                {retainCount > 0 && <Badge variant="destructive">{retainCount} not eligible</Badge>}
                 <Badge variant="secondary">{eligibleStudents.length} total</Badge>
               </div>
 
@@ -117,31 +215,55 @@ const Promotion = () => {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-12">Failed</TableHead>
                       <TableHead>Roll No</TableHead>
                       <TableHead>Name</TableHead>
                       <TableHead>Section</TableHead>
+                      <TableHead>%</TableHead>
+                      <TableHead>Attendance</TableHead>
                       <TableHead>Status</TableHead>
+                      <TableHead className="w-24">Action</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {eligibleStudents.map(s => {
-                      const isFailed = failedStudents.has(s.id);
+                      const info = eligibilityMap.get(s.id);
+                      const status = getEffectiveStatus(s.id);
                       return (
-                        <TableRow key={s.id} className={isFailed ? 'bg-destructive/5' : ''}>
-                          <TableCell>
-                            <Checkbox
-                              checked={isFailed}
-                              onCheckedChange={() => toggleFailed(s.id)}
-                            />
-                          </TableCell>
+                        <TableRow key={s.id} className={status === 'not-eligible' ? 'bg-destructive/5' : status === 'force-promoted' ? 'bg-accent/10' : ''}>
                           <TableCell>{s.rollNo}</TableCell>
                           <TableCell className="font-medium">{s.name}</TableCell>
                           <TableCell>{s.section}</TableCell>
+                          <TableCell>{info?.percentage != null ? `${info.percentage.toFixed(1)}%` : '—'}</TableCell>
+                          <TableCell>{info?.attendancePercent != null ? `${info.attendancePercent.toFixed(1)}%` : '—'}</TableCell>
                           <TableCell>
-                            <Badge variant={isFailed ? 'destructive' : 'default'} className="text-[10px]">
-                              {isFailed ? 'Retained' : 'Promote'}
+                            <Badge
+                              variant={status === 'eligible' ? 'default' : status === 'force-promoted' ? 'secondary' : 'destructive'}
+                              className="text-[10px]"
+                            >
+                              {status === 'eligible' ? 'Eligible' : status === 'force-promoted' ? 'On Consideration' : 'Not Eligible'}
                             </Badge>
+                          </TableCell>
+                          <TableCell>
+                            {status === 'not-eligible' && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-7 text-xs"
+                                onClick={() => setForcePromoteStudent(s.id)}
+                              >
+                                Promote
+                              </Button>
+                            )}
+                            {status === 'force-promoted' && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 text-xs text-destructive"
+                                onClick={() => handleUndoForce(s.id)}
+                              >
+                                Undo
+                              </Button>
+                            )}
                           </TableCell>
                         </TableRow>
                       );
@@ -168,7 +290,7 @@ const Promotion = () => {
                   <AlertTriangle className="h-4 w-4 text-accent mt-0.5" />
                   <p className="text-xs text-muted-foreground">
                     This will promote <strong>{promoteCount}</strong> students from <strong>{fromClass}</strong> to <strong>{toClass}</strong>.
-                    {retainCount > 0 && <> <strong>{retainCount}</strong> student(s) marked as failed will remain in <strong>{fromClass}</strong>.</>}
+                    {retainCount > 0 && <> <strong>{retainCount}</strong> student(s) will remain in <strong>{fromClass}</strong>.</>}
                   </p>
                 </div>
               )}
@@ -179,6 +301,42 @@ const Promotion = () => {
           )}
         </CardContent>
       </Card>
+
+      {/* Force Promote Confirmation Dialog */}
+      <Dialog open={!!forcePromoteStudent} onOpenChange={open => { if (!open) setForcePromoteStudent(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ShieldAlert className="h-5 w-5 text-destructive" />
+              Force Promote Student
+            </DialogTitle>
+            <DialogDescription>
+              This student is <strong>not eligible</strong> for promotion based on the current policy.
+            </DialogDescription>
+          </DialogHeader>
+          {forcePromoteStudentData && forcePromoteInfo && (
+            <div className="space-y-3">
+              <div className="rounded-lg border p-3 space-y-2">
+                <p className="text-sm font-medium">{forcePromoteStudentData.name} ({forcePromoteStudentData.rollNo})</p>
+                <div className="space-y-1">
+                  {forcePromoteInfo.reasons.map((r, i) => (
+                    <p key={i} className="text-xs text-destructive flex items-center gap-1.5">
+                      <AlertTriangle className="h-3 w-3" /> {r}
+                    </p>
+                  ))}
+                </div>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Are you sure you want to promote this student <strong>on consideration</strong>? This action will override the promotion policy.
+              </p>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setForcePromoteStudent(null)}>Cancel</Button>
+            <Button variant="destructive" onClick={handleForcePromoteConfirm}>Yes, Promote on Consideration</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
