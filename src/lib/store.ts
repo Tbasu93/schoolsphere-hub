@@ -118,6 +118,19 @@ export interface ExamResult {
   status: 'Pass' | 'Fail';
 }
 
+export interface RoutinePeriod {
+  id: string;
+  day: 'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 'Friday' | 'Saturday';
+  periodNo: number;
+  startTime: string;
+  endTime: string;
+  className: string;
+  section: string;
+  subject: string;
+  teacherId: string;
+  teacherName: string;
+}
+
 function generateId() {
   return Math.random().toString(36).substring(2, 10);
 }
@@ -237,6 +250,9 @@ export const store = {
 
   getExamResults: (): ExamResult[] => load('examResults', []),
   setExamResults: (r: ExamResult[]) => save('examResults', r),
+
+  getRoutine: (): RoutinePeriod[] => load('routine', []),
+  setRoutine: (r: RoutinePeriod[]) => save('routine', r),
 
   generateId,
 };

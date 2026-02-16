@@ -11,6 +11,7 @@ import {
   ClipboardCheck,
   Receipt,
   FileText,
+  CalendarClock,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import {
@@ -34,6 +35,7 @@ const mainNav = [
 ];
 
 const academicNav = [
+  { title: "Routine", url: "/routine", icon: CalendarClock },
   { title: "Examinations", url: "/exams", icon: FileText },
   { title: "Promotion", url: "/promotion", icon: ArrowUpCircle },
 ];
