@@ -138,17 +138,17 @@ export interface RoutinePeriod {
 }
 
 export interface PromotionPolicy {
-  minPercentage: number;
-  minAttendancePercent: number;
-  requireAllSubjectsPass: boolean;
-  minSubjectsPass: number;
+  compulsoryCategories: string[]; // e.g. ['Core', '2nd Language']
+  passMarksPercent: number; // min % to pass each subject
+  passCriteria: 'all' | 'compulsory+3' | 'compulsory+4' | 'compulsory+5';
+  examScope: 'annual' | 'all'; // Only Annual Exam or All Exams combined
 }
 
 const defaultPromotionPolicy: PromotionPolicy = {
-  minPercentage: 40,
-  minAttendancePercent: 75,
-  requireAllSubjectsPass: false,
-  minSubjectsPass: 0,
+  compulsoryCategories: ['Core'],
+  passMarksPercent: 40,
+  passCriteria: 'compulsory+4',
+  examScope: 'annual',
 };
 
 function generateId() {
