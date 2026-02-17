@@ -40,10 +40,16 @@ export interface Staff {
   status: 'Active' | 'Inactive';
 }
 
+export interface SubjectEntry {
+  name: string;
+  category: 'Core' | '2nd Language' | '3rd Language' | 'Additional';
+}
+
 export interface ClassConfig {
   id: string;
   name: string;
   sections: string[];
+  subjects: SubjectEntry[];
   classTeacher?: string;
 }
 
@@ -160,20 +166,27 @@ export function calculateGrade(percentage: number): string {
 }
 
 // Seed data
+const defaultSubjects: SubjectEntry[] = [
+  { name: 'English', category: 'Core' },
+  { name: 'Mathematics', category: 'Core' },
+  { name: 'Science', category: 'Core' },
+  { name: 'Social Studies', category: 'Core' },
+];
+
 const defaultClasses: ClassConfig[] = [
-  { id: generateId(), name: 'Nursery', sections: ['A', 'B'] },
-  { id: generateId(), name: 'LKG', sections: ['A', 'B'] },
-  { id: generateId(), name: 'UKG', sections: ['A', 'B'] },
-  { id: generateId(), name: 'Class 1', sections: ['A', 'B', 'C'] },
-  { id: generateId(), name: 'Class 2', sections: ['A', 'B', 'C'] },
-  { id: generateId(), name: 'Class 3', sections: ['A', 'B', 'C'] },
-  { id: generateId(), name: 'Class 4', sections: ['A', 'B'] },
-  { id: generateId(), name: 'Class 5', sections: ['A', 'B'] },
-  { id: generateId(), name: 'Class 6', sections: ['A', 'B'] },
-  { id: generateId(), name: 'Class 7', sections: ['A', 'B'] },
-  { id: generateId(), name: 'Class 8', sections: ['A', 'B'] },
-  { id: generateId(), name: 'Class 9', sections: ['A', 'B'] },
-  { id: generateId(), name: 'Class 10', sections: ['A', 'B'] },
+  { id: generateId(), name: 'Nursery', sections: ['A', 'B'], subjects: [{ name: 'English', category: 'Core' }, { name: 'Mathematics', category: 'Core' }, { name: 'EVS', category: 'Core' }] },
+  { id: generateId(), name: 'LKG', sections: ['A', 'B'], subjects: [{ name: 'English', category: 'Core' }, { name: 'Mathematics', category: 'Core' }, { name: 'EVS', category: 'Core' }] },
+  { id: generateId(), name: 'UKG', sections: ['A', 'B'], subjects: [{ name: 'English', category: 'Core' }, { name: 'Mathematics', category: 'Core' }, { name: 'EVS', category: 'Core' }] },
+  { id: generateId(), name: 'Class 1', sections: ['A', 'B', 'C'], subjects: [...defaultSubjects, { name: 'Hindi', category: '2nd Language' }] },
+  { id: generateId(), name: 'Class 2', sections: ['A', 'B', 'C'], subjects: [...defaultSubjects, { name: 'Hindi', category: '2nd Language' }] },
+  { id: generateId(), name: 'Class 3', sections: ['A', 'B', 'C'], subjects: [...defaultSubjects, { name: 'Hindi', category: '2nd Language' }] },
+  { id: generateId(), name: 'Class 4', sections: ['A', 'B'], subjects: [...defaultSubjects, { name: 'Hindi', category: '2nd Language' }, { name: 'Computer Science', category: 'Additional' }] },
+  { id: generateId(), name: 'Class 5', sections: ['A', 'B'], subjects: [...defaultSubjects, { name: 'Hindi', category: '2nd Language' }, { name: 'Computer Science', category: 'Additional' }] },
+  { id: generateId(), name: 'Class 6', sections: ['A', 'B'], subjects: [...defaultSubjects, { name: 'Hindi', category: '2nd Language' }, { name: 'Sanskrit', category: '3rd Language' }] },
+  { id: generateId(), name: 'Class 7', sections: ['A', 'B'], subjects: [...defaultSubjects, { name: 'Hindi', category: '2nd Language' }, { name: 'Sanskrit', category: '3rd Language' }] },
+  { id: generateId(), name: 'Class 8', sections: ['A', 'B'], subjects: [...defaultSubjects, { name: 'Hindi', category: '2nd Language' }, { name: 'Sanskrit', category: '3rd Language' }] },
+  { id: generateId(), name: 'Class 9', sections: ['A', 'B'], subjects: [...defaultSubjects, { name: 'Hindi', category: '2nd Language' }, { name: 'Sanskrit', category: '3rd Language' }, { name: 'Computer Science', category: 'Additional' }] },
+  { id: generateId(), name: 'Class 10', sections: ['A', 'B'], subjects: [...defaultSubjects, { name: 'Hindi', category: '2nd Language' }, { name: 'Sanskrit', category: '3rd Language' }, { name: 'Computer Science', category: 'Additional' }] },
 ];
 
 const sampleStudents: Student[] = [
