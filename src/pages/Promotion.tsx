@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { PageHeader } from "@/components/PageHeader";
-import { store } from "@/lib/store";
+import { store, PromotionPolicy } from "@/lib/store";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -15,19 +15,25 @@ interface EligibilityInfo {
   eligible: boolean;
   reasons: string[];
   percentage: number | null;
-  attendancePercent: number | null;
+  passedCount: number;
+  totalSubjects: number;
 }
+
+const passCriteriaLabel = (p: PromotionPolicy) => {
+  if (p.passCriteria === 'all') return 'All Subjects';
+  return `Compulsory + ${p.passCriteria.split('+')[1]}`;
+};
 
 const Promotion = () => {
   const classes = store.getClasses();
   const [students, setStudents] = useState(store.getStudents());
   const examResults = store.getExamResults();
-  const attendanceRecords = store.getAttendance();
   const policy = store.getPromotionPolicy();
   const [fromClass, setFromClass] = useState('');
   const [toClass, setToClass] = useState('');
   const [promoted, setPromoted] = useState(false);
   const [forcePromoteStudent, setForcePromoteStudent] = useState<string | null>(null);
+  const [forcePromoted, setForcePromoted] = useState<Set<string>>(new Set());
 
   const eligibleStudents = students.filter(s => s.className === fromClass && s.status === 'Active');
 
@@ -37,68 +43,119 @@ const Promotion = () => {
     return '';
   };
 
-  // Compute eligibility for each student based on policy
   const eligibilityMap = useMemo(() => {
     const map = new Map<string, EligibilityInfo>();
+    const classConfig = classes.find(c => c.name === fromClass);
+    const classSubjects = classConfig?.subjects || [];
+
     eligibleStudents.forEach(s => {
       const reasons: string[] = [];
       let eligible = true;
 
-      // Check exam results
-      const studentResults = examResults.filter(r => r.studentId === s.id);
-      let percentage: number | null = null;
-      if (studentResults.length > 0) {
+      // Get relevant exam results based on examScope
+      const studentResults = examResults.filter(r => r.studentId === s.id && r.className === fromClass);
+
+      if (studentResults.length === 0) {
+        map.set(s.id, { eligible: true, reasons: ['No exam data'], percentage: null, passedCount: 0, totalSubjects: 0 });
+        return;
+      }
+
+      // Build subject-wise marks: combine all exams or use latest (annual)
+      let subjectMarks: Map<string, { obtained: number; max: number }>;
+
+      if (policy.examScope === 'all') {
+        // Combine marks from ALL exams
+        subjectMarks = new Map();
+        studentResults.forEach(r => {
+          r.marks.forEach(m => {
+            const existing = subjectMarks.get(m.subject);
+            if (existing) {
+              subjectMarks.set(m.subject, { obtained: existing.obtained + m.obtained, max: existing.max + m.max });
+            } else {
+              subjectMarks.set(m.subject, { obtained: m.obtained, max: m.max });
+            }
+          });
+        });
+      } else {
+        // Only latest (annual) exam
         const latest = studentResults[studentResults.length - 1];
-        percentage = latest.percentage;
+        subjectMarks = new Map(latest.marks.map(m => [m.subject, { obtained: m.obtained, max: m.max }]));
+      }
 
-        if (percentage < policy.minPercentage) {
+      // Calculate overall percentage
+      let totalObtained = 0, totalMax = 0;
+      subjectMarks.forEach(v => { totalObtained += v.obtained; totalMax += v.max; });
+      const percentage = totalMax > 0 ? (totalObtained / totalMax) * 100 : 0;
+
+      // Determine which subjects are compulsory for THIS student
+      const compulsorySubjectNames: string[] = [];
+      const nonCompulsorySubjectNames: string[] = [];
+
+      // For each subject the student has marks in, classify it
+      subjectMarks.forEach((_, subjectName) => {
+        const subjectConfig = classSubjects.find(cs => cs.name === subjectName);
+        const category = subjectConfig?.category || 'Core';
+        if (policy.compulsoryCategories.includes(category)) {
+          compulsorySubjectNames.push(subjectName);
+        } else {
+          nonCompulsorySubjectNames.push(subjectName);
+        }
+      });
+
+      // Check pass status per subject
+      const passThreshold = policy.passMarksPercent / 100;
+      const passedCompulsory: string[] = [];
+      const failedCompulsory: string[] = [];
+      const passedNonCompulsory: string[] = [];
+
+      compulsorySubjectNames.forEach(name => {
+        const m = subjectMarks.get(name)!;
+        if ((m.obtained / m.max) >= passThreshold) {
+          passedCompulsory.push(name);
+        } else {
+          failedCompulsory.push(name);
+        }
+      });
+
+      nonCompulsorySubjectNames.forEach(name => {
+        const m = subjectMarks.get(name)!;
+        if ((m.obtained / m.max) >= passThreshold) {
+          passedNonCompulsory.push(name);
+        }
+      });
+
+      // Check compulsory subjects pass
+      if (failedCompulsory.length > 0) {
+        eligible = false;
+        reasons.push(`Failed compulsory: ${failedCompulsory.join(', ')}`);
+      }
+
+      // Check pass criteria
+      if (policy.passCriteria === 'all') {
+        // Must pass ALL subjects
+        const totalPassed = passedCompulsory.length + passedNonCompulsory.length;
+        const totalSubjects = subjectMarks.size;
+        if (totalPassed < totalSubjects) {
           eligible = false;
-          reasons.push(`Percentage ${percentage.toFixed(1)}% < ${policy.minPercentage}%`);
-        }
-
-        if (policy.requireAllSubjectsPass) {
-          const failedSubjects = latest.marks.filter(m => m.obtained < (m.max * policy.minPercentage / 100));
-          if (failedSubjects.length > 0) {
-            eligible = false;
-            reasons.push(`Failed ${failedSubjects.length} subject(s)`);
-          }
-        } else if (policy.minSubjectsPass > 0) {
-          const passedSubjects = latest.marks.filter(m => m.obtained >= (m.max * policy.minPercentage / 100)).length;
-          if (passedSubjects < policy.minSubjectsPass) {
-            eligible = false;
-            reasons.push(`Passed ${passedSubjects}/${policy.minSubjectsPass} required subjects`);
+          if (failedCompulsory.length === 0) {
+            const failedNonComp = nonCompulsorySubjectNames.filter(n => !passedNonCompulsory.includes(n));
+            reasons.push(`Failed: ${failedNonComp.join(', ')}`);
           }
         }
-
-        if (latest.status === 'Fail') {
-          if (!reasons.length) {
-            eligible = false;
-            reasons.push('Exam status: Fail');
-          }
+      } else {
+        // Compulsory + N: must pass all compulsory + N additional
+        const requiredAdditional = parseInt(policy.passCriteria.split('+')[1]);
+        if (passedNonCompulsory.length < requiredAdditional) {
+          eligible = false;
+          reasons.push(`Passed ${passedNonCompulsory.length}/${requiredAdditional} required additional subjects`);
         }
       }
 
-      // Check attendance
-      let attendancePercent: number | null = null;
-      const studentAttendance = attendanceRecords.flatMap(a =>
-        a.records.filter(r => r.studentId === s.id).map(r => r.status)
-      );
-      if (studentAttendance.length > 0) {
-        const present = studentAttendance.filter(st => st === 'Present' || st === 'Late').length;
-        attendancePercent = (present / studentAttendance.length) * 100;
-        if (attendancePercent < policy.minAttendancePercent) {
-          eligible = false;
-          reasons.push(`Attendance ${attendancePercent.toFixed(1)}% < ${policy.minAttendancePercent}%`);
-        }
-      }
-
-      map.set(s.id, { eligible, reasons, percentage, attendancePercent });
+      const totalPassed = passedCompulsory.length + passedNonCompulsory.length;
+      map.set(s.id, { eligible, reasons, percentage, passedCount: totalPassed, totalSubjects: subjectMarks.size });
     });
     return map;
-  }, [eligibleStudents, examResults, attendanceRecords, policy]);
-
-  // Track force-promoted students (ineligible but admin approved)
-  const [forcePromoted, setForcePromoted] = useState<Set<string>>(new Set());
+  }, [eligibleStudents, examResults, policy, fromClass, classes]);
 
   const handleFromChange = (val: string) => {
     setFromClass(val);
@@ -117,11 +174,7 @@ const Promotion = () => {
   };
 
   const handleUndoForce = (studentId: string) => {
-    setForcePromoted(prev => {
-      const next = new Set(prev);
-      next.delete(studentId);
-      return next;
-    });
+    setForcePromoted(prev => { const next = new Set(prev); next.delete(studentId); return next; });
   };
 
   const getEffectiveStatus = (studentId: string) => {
@@ -170,7 +223,7 @@ const Promotion = () => {
     <div>
       <PageHeader title="Student Promotion" description="Auto-eligibility based on promotion policy. Force-promote with confirmation." />
 
-      <Card className="max-w-4xl">
+      <Card className="max-w-5xl">
         <CardHeader>
           <CardTitle className="text-base font-heading">Class Promotion</CardTitle>
         </CardHeader>
@@ -195,12 +248,10 @@ const Promotion = () => {
 
           {/* Policy summary */}
           <div className="flex gap-2 flex-wrap text-xs">
-            <Badge variant="outline">Min {policy.minPercentage}%</Badge>
-            <Badge variant="outline">Min Attendance {policy.minAttendancePercent}%</Badge>
-            {policy.requireAllSubjectsPass && <Badge variant="outline">All Subjects Pass</Badge>}
-            {!policy.requireAllSubjectsPass && policy.minSubjectsPass > 0 && (
-              <Badge variant="outline">Min {policy.minSubjectsPass} Subjects Pass</Badge>
-            )}
+            <Badge variant="outline">Pass: {policy.passMarksPercent}%</Badge>
+            <Badge variant="outline">Criteria: {passCriteriaLabel(policy)}</Badge>
+            <Badge variant="outline">Compulsory: {policy.compulsoryCategories.join(', ')}</Badge>
+            <Badge variant="outline">Exam: {policy.examScope === 'annual' ? 'Annual Only' : 'All Exams'}</Badge>
           </div>
 
           {fromClass && eligibleStudents.length > 0 && (
@@ -211,7 +262,7 @@ const Promotion = () => {
                 <Badge variant="secondary">{eligibleStudents.length} total</Badge>
               </div>
 
-              <div className="rounded-lg border">
+              <div className="rounded-lg border overflow-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -219,7 +270,7 @@ const Promotion = () => {
                       <TableHead>Name</TableHead>
                       <TableHead>Section</TableHead>
                       <TableHead>%</TableHead>
-                      <TableHead>Attendance</TableHead>
+                      <TableHead>Subjects Passed</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead className="w-24">Action</TableHead>
                     </TableRow>
@@ -234,7 +285,7 @@ const Promotion = () => {
                           <TableCell className="font-medium">{s.name}</TableCell>
                           <TableCell>{s.section}</TableCell>
                           <TableCell>{info?.percentage != null ? `${info.percentage.toFixed(1)}%` : '—'}</TableCell>
-                          <TableCell>{info?.attendancePercent != null ? `${info.attendancePercent.toFixed(1)}%` : '—'}</TableCell>
+                          <TableCell>{info?.totalSubjects ? `${info.passedCount}/${info.totalSubjects}` : '—'}</TableCell>
                           <TableCell>
                             <Badge
                               variant={status === 'eligible' ? 'default' : status === 'force-promoted' ? 'secondary' : 'destructive'}
@@ -245,22 +296,12 @@ const Promotion = () => {
                           </TableCell>
                           <TableCell>
                             {status === 'not-eligible' && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="h-7 text-xs"
-                                onClick={() => setForcePromoteStudent(s.id)}
-                              >
+                              <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setForcePromoteStudent(s.id)}>
                                 Promote
                               </Button>
                             )}
                             {status === 'force-promoted' && (
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                className="h-7 text-xs text-destructive"
-                                onClick={() => handleUndoForce(s.id)}
-                              >
+                              <Button size="sm" variant="ghost" className="h-7 text-xs text-destructive" onClick={() => handleUndoForce(s.id)}>
                                 Undo
                               </Button>
                             )}
