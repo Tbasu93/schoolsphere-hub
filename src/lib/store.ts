@@ -49,7 +49,7 @@ export interface ClassConfig {
   id: string;
   name: string;
   sections: string[];
-  subjects: SubjectEntry[];
+  sectionSubjects: Record<string, SubjectEntry[]>; // key = section name
   classTeacher?: string;
 }
 
@@ -173,20 +173,32 @@ const defaultSubjects: SubjectEntry[] = [
   { name: 'Social Studies', category: 'Core' },
 ];
 
+const nurserySubjects: SubjectEntry[] = [{ name: 'English', category: 'Core' }, { name: 'Mathematics', category: 'Core' }, { name: 'EVS', category: 'Core' }];
+const midSubjects: SubjectEntry[] = [...defaultSubjects, { name: 'Hindi', category: '2nd Language' }];
+const midSubjectsWithCS: SubjectEntry[] = [...defaultSubjects, { name: 'Hindi', category: '2nd Language' }, { name: 'Computer Science', category: 'Additional' }];
+const seniorSubjects: SubjectEntry[] = [...defaultSubjects, { name: 'Hindi', category: '2nd Language' }, { name: 'Sanskrit', category: '3rd Language' }];
+const seniorSubjectsWithCS: SubjectEntry[] = [...defaultSubjects, { name: 'Hindi', category: '2nd Language' }, { name: 'Sanskrit', category: '3rd Language' }, { name: 'Computer Science', category: 'Additional' }];
+
+const makeSectionSubjects = (sections: string[], subjects: SubjectEntry[]): Record<string, SubjectEntry[]> => {
+  const result: Record<string, SubjectEntry[]> = {};
+  sections.forEach(s => { result[s] = [...subjects]; });
+  return result;
+};
+
 const defaultClasses: ClassConfig[] = [
-  { id: generateId(), name: 'Nursery', sections: ['A', 'B'], subjects: [{ name: 'English', category: 'Core' }, { name: 'Mathematics', category: 'Core' }, { name: 'EVS', category: 'Core' }] },
-  { id: generateId(), name: 'LKG', sections: ['A', 'B'], subjects: [{ name: 'English', category: 'Core' }, { name: 'Mathematics', category: 'Core' }, { name: 'EVS', category: 'Core' }] },
-  { id: generateId(), name: 'UKG', sections: ['A', 'B'], subjects: [{ name: 'English', category: 'Core' }, { name: 'Mathematics', category: 'Core' }, { name: 'EVS', category: 'Core' }] },
-  { id: generateId(), name: 'Class 1', sections: ['A', 'B', 'C'], subjects: [...defaultSubjects, { name: 'Hindi', category: '2nd Language' }] },
-  { id: generateId(), name: 'Class 2', sections: ['A', 'B', 'C'], subjects: [...defaultSubjects, { name: 'Hindi', category: '2nd Language' }] },
-  { id: generateId(), name: 'Class 3', sections: ['A', 'B', 'C'], subjects: [...defaultSubjects, { name: 'Hindi', category: '2nd Language' }] },
-  { id: generateId(), name: 'Class 4', sections: ['A', 'B'], subjects: [...defaultSubjects, { name: 'Hindi', category: '2nd Language' }, { name: 'Computer Science', category: 'Additional' }] },
-  { id: generateId(), name: 'Class 5', sections: ['A', 'B'], subjects: [...defaultSubjects, { name: 'Hindi', category: '2nd Language' }, { name: 'Computer Science', category: 'Additional' }] },
-  { id: generateId(), name: 'Class 6', sections: ['A', 'B'], subjects: [...defaultSubjects, { name: 'Hindi', category: '2nd Language' }, { name: 'Sanskrit', category: '3rd Language' }] },
-  { id: generateId(), name: 'Class 7', sections: ['A', 'B'], subjects: [...defaultSubjects, { name: 'Hindi', category: '2nd Language' }, { name: 'Sanskrit', category: '3rd Language' }] },
-  { id: generateId(), name: 'Class 8', sections: ['A', 'B'], subjects: [...defaultSubjects, { name: 'Hindi', category: '2nd Language' }, { name: 'Sanskrit', category: '3rd Language' }] },
-  { id: generateId(), name: 'Class 9', sections: ['A', 'B'], subjects: [...defaultSubjects, { name: 'Hindi', category: '2nd Language' }, { name: 'Sanskrit', category: '3rd Language' }, { name: 'Computer Science', category: 'Additional' }] },
-  { id: generateId(), name: 'Class 10', sections: ['A', 'B'], subjects: [...defaultSubjects, { name: 'Hindi', category: '2nd Language' }, { name: 'Sanskrit', category: '3rd Language' }, { name: 'Computer Science', category: 'Additional' }] },
+  { id: generateId(), name: 'Nursery', sections: ['A', 'B'], sectionSubjects: makeSectionSubjects(['A', 'B'], nurserySubjects) },
+  { id: generateId(), name: 'LKG', sections: ['A', 'B'], sectionSubjects: makeSectionSubjects(['A', 'B'], nurserySubjects) },
+  { id: generateId(), name: 'UKG', sections: ['A', 'B'], sectionSubjects: makeSectionSubjects(['A', 'B'], nurserySubjects) },
+  { id: generateId(), name: 'Class 1', sections: ['A', 'B', 'C'], sectionSubjects: makeSectionSubjects(['A', 'B', 'C'], midSubjects) },
+  { id: generateId(), name: 'Class 2', sections: ['A', 'B', 'C'], sectionSubjects: makeSectionSubjects(['A', 'B', 'C'], midSubjects) },
+  { id: generateId(), name: 'Class 3', sections: ['A', 'B', 'C'], sectionSubjects: makeSectionSubjects(['A', 'B', 'C'], midSubjects) },
+  { id: generateId(), name: 'Class 4', sections: ['A', 'B'], sectionSubjects: makeSectionSubjects(['A', 'B'], midSubjectsWithCS) },
+  { id: generateId(), name: 'Class 5', sections: ['A', 'B'], sectionSubjects: makeSectionSubjects(['A', 'B'], midSubjectsWithCS) },
+  { id: generateId(), name: 'Class 6', sections: ['A', 'B'], sectionSubjects: makeSectionSubjects(['A', 'B'], seniorSubjects) },
+  { id: generateId(), name: 'Class 7', sections: ['A', 'B'], sectionSubjects: makeSectionSubjects(['A', 'B'], seniorSubjects) },
+  { id: generateId(), name: 'Class 8', sections: ['A', 'B'], sectionSubjects: makeSectionSubjects(['A', 'B'], seniorSubjects) },
+  { id: generateId(), name: 'Class 9', sections: ['A', 'B'], sectionSubjects: makeSectionSubjects(['A', 'B'], seniorSubjectsWithCS) },
+  { id: generateId(), name: 'Class 10', sections: ['A', 'B'], sectionSubjects: makeSectionSubjects(['A', 'B'], seniorSubjectsWithCS) },
 ];
 
 const sampleStudents: Student[] = [

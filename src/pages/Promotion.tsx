@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { PageHeader } from "@/components/PageHeader";
-import { store, PromotionPolicy } from "@/lib/store";
+import { store, PromotionPolicy, SubjectEntry } from "@/lib/store";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -46,7 +46,16 @@ const Promotion = () => {
   const eligibilityMap = useMemo(() => {
     const map = new Map<string, EligibilityInfo>();
     const classConfig = classes.find(c => c.name === fromClass);
-    const classSubjects = classConfig?.subjects || [];
+    // Gather all unique subjects across all sections for promotion eligibility
+    const allSectionSubjects = classConfig?.sectionSubjects || {};
+    const classSubjects: SubjectEntry[] = [];
+    const seen = new Set<string>();
+    Object.values(allSectionSubjects).forEach(subs => {
+      subs.forEach(sub => {
+        const key = `${sub.name}|${sub.category}`;
+        if (!seen.has(key)) { seen.add(key); classSubjects.push(sub); }
+      });
+    });
 
     eligibleStudents.forEach(s => {
       const reasons: string[] = [];
