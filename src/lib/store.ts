@@ -100,14 +100,31 @@ export interface AttendanceRecord {
   records: { studentId: string; studentName: string; status: 'Present' | 'Absent' | 'Late' }[];
 }
 
+export interface ExamSubjectConfig {
+  name: string;
+  theoryMax: number;
+  practicalMax: number; // 0 means no practical component
+  practicalName: string; // e.g. "Project", "Lab Practical", "Oral"
+}
+
 export interface Exam {
   id: string;
   name: string;
   className: string;
   date: string;
-  subjects: string[];
-  maxMarks: number;
-  passMarks: number;
+  subjects: ExamSubjectConfig[];
+  passPercent: number; // min % to pass each subject
+}
+
+export interface SubjectMark {
+  subject: string;
+  theoryObtained: number;
+  theoryMax: number;
+  practicalObtained: number;
+  practicalMax: number;
+  practicalName: string;
+  obtained: number; // theory + practical
+  max: number; // theoryMax + practicalMax
 }
 
 export interface ExamResult {
@@ -116,7 +133,7 @@ export interface ExamResult {
   studentId: string;
   studentName: string;
   className: string;
-  marks: { subject: string; obtained: number; max: number }[];
+  marks: SubjectMark[];
   totalObtained: number;
   totalMax: number;
   percentage: number;
