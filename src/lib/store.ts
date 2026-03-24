@@ -116,13 +116,24 @@ export interface Exam {
   passPercent: number; // min % to pass each subject
 }
 
+export interface SubjectMark {
+  subject: string;
+  theoryObtained: number;
+  theoryMax: number;
+  practicalObtained: number;
+  practicalMax: number;
+  practicalName: string;
+  obtained: number; // theory + practical
+  max: number; // theoryMax + practicalMax
+}
+
 export interface ExamResult {
   id: string;
   examId: string;
   studentId: string;
   studentName: string;
   className: string;
-  marks: { subject: string; obtained: number; max: number }[];
+  marks: SubjectMark[];
   totalObtained: number;
   totalMax: number;
   percentage: number;
