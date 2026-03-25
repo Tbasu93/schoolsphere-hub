@@ -13,6 +13,10 @@ import {
   FileText,
   CalendarClock,
   SlidersHorizontal,
+  Trophy,
+  Package,
+  Award,
+  Home,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import {
@@ -46,10 +50,16 @@ const financeNav = [
   { title: "Fee Collection", url: "/fee-collection", icon: Receipt },
 ];
 
+const studentServicesNav = [
+  { title: "Items", url: "/items", icon: Package },
+  { title: "Certificates", url: "/certificates", icon: Award },
+  { title: "Houses", url: "/houses", icon: Home },
+];
+
 const configNav = [
   { title: "Classes & Sections", url: "/classes", icon: School },
   { title: "Promotion Policy", url: "/promotion-policy", icon: SlidersHorizontal },
-  { title: "Events & Holidays", url: "/events", icon: CalendarDays },
+  { title: "Events & Awards", url: "/events", icon: Trophy },
   { title: "Notices", url: "/notices", icon: Megaphone },
 ];
 
@@ -57,6 +67,7 @@ const navGroups = [
   { label: "Main", items: mainNav },
   { label: "Academics", items: academicNav },
   { label: "Finance", items: financeNav },
+  { label: "Student Services", items: studentServicesNav },
   { label: "Configure", items: configNav },
 ];
 

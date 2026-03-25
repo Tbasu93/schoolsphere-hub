@@ -11,13 +11,16 @@ import StaffPage from "./pages/StaffPage";
 import Classes from "./pages/Classes";
 import Fees from "./pages/Fees";
 import FeeCollection from "./pages/FeeCollection";
-import Events from "./pages/Events";
+import EventsAwards from "./pages/EventsAwards";
 import Notices from "./pages/Notices";
 import Promotion from "./pages/Promotion";
 import PromotionPolicy from "./pages/PromotionPolicy";
 import Attendance from "./pages/Attendance";
 import Exams from "./pages/Exams";
 import Routine from "./pages/Routine";
+import Items from "./pages/Items";
+import Certificates from "./pages/Certificates";
+import Houses from "./pages/Houses";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -40,10 +43,13 @@ const App = () => (
             <Route path="/classes" element={<Classes />} />
             <Route path="/fees" element={<Fees />} />
             <Route path="/fee-collection" element={<FeeCollection />} />
-            <Route path="/events" element={<Events />} />
+            <Route path="/events" element={<EventsAwards />} />
             <Route path="/notices" element={<Notices />} />
             <Route path="/promotion" element={<Promotion />} />
             <Route path="/promotion-policy" element={<PromotionPolicy />} />
+            <Route path="/items" element={<Items />} />
+            <Route path="/certificates" element={<Certificates />} />
+            <Route path="/houses" element={<Houses />} />
           </Route>
           <Route path="*" element={<NotFound />} />
         </Routes>
