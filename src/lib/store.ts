@@ -14,6 +14,7 @@ export interface Student {
   address: string;
   admissionDate: string;
   status: 'Active' | 'Inactive';
+  house?: string;
 }
 
 export interface Teacher {
@@ -49,7 +50,7 @@ export interface ClassConfig {
   id: string;
   name: string;
   sections: string[];
-  sectionSubjects: Record<string, SubjectEntry[]>; // key = section name
+  sectionSubjects: Record<string, SubjectEntry[]>;
   classTeacher?: string;
 }
 
@@ -103,17 +104,20 @@ export interface AttendanceRecord {
 export interface ExamSubjectConfig {
   name: string;
   theoryMax: number;
-  practicalMax: number; // 0 means no practical component
-  practicalName: string; // e.g. "Project", "Lab Practical", "Oral"
+  practicalMax: number;
+  practicalName: string;
 }
 
 export interface Exam {
   id: string;
   name: string;
   className: string;
+  section: string;
   date: string;
   subjects: ExamSubjectConfig[];
-  passPercent: number; // min % to pass each subject
+  passPercent: number;
+  admitCardIssued?: Record<string, boolean>; // studentId -> issued
+  reportCardIssued?: Record<string, boolean>; // studentId -> issued
 }
 
 export interface SubjectMark {
@@ -123,8 +127,8 @@ export interface SubjectMark {
   practicalObtained: number;
   practicalMax: number;
   practicalName: string;
-  obtained: number; // theory + practical
-  max: number; // theoryMax + practicalMax
+  obtained: number;
+  max: number;
 }
 
 export interface ExamResult {
@@ -133,6 +137,7 @@ export interface ExamResult {
   studentId: string;
   studentName: string;
   className: string;
+  section: string;
   marks: SubjectMark[];
   totalObtained: number;
   totalMax: number;
@@ -155,10 +160,52 @@ export interface RoutinePeriod {
 }
 
 export interface PromotionPolicy {
-  compulsoryCategories: string[]; // e.g. ['Core', '2nd Language']
-  passMarksPercent: number; // min % to pass each subject
+  compulsoryCategories: string[];
+  passMarksPercent: number;
   passCriteria: 'all' | 'compulsory+3' | 'compulsory+4' | 'compulsory+5';
-  examScope: 'annual' | 'all'; // Only Annual Exam or All Exams combined
+  examScope: 'annual' | 'all';
+}
+
+// --- New interfaces for Batch C & D ---
+
+export interface EventParticipation {
+  id: string;
+  eventId: string;
+  studentId: string;
+  studentName: string;
+  className: string;
+  section: string;
+  category: string;
+  achievement: string; // e.g. '1st Place', 'Participated', 'Winner'
+  status: 'Participated' | 'Awarded';
+}
+
+export interface StudentItem {
+  id: string;
+  studentId: string;
+  studentName: string;
+  className: string;
+  section: string;
+  itemName: string;
+  quantity: number;
+  status: 'Collected' | 'Pending' | 'Booked';
+  date: string;
+}
+
+export interface Certificate {
+  id: string;
+  studentId: string;
+  studentName: string;
+  className: string;
+  section: string;
+  type: 'Transfer Certificate' | 'Character Certificate' | 'Migration Certificate';
+  appliedDate: string;
+  issuedDate: string;
+  status: 'Applied' | 'Issued';
+}
+
+export interface HouseConfig {
+  names: string[];
 }
 
 const defaultPromotionPolicy: PromotionPolicy = {
@@ -166,6 +213,10 @@ const defaultPromotionPolicy: PromotionPolicy = {
   passMarksPercent: 40,
   passCriteria: 'compulsory+4',
   examScope: 'annual',
+};
+
+const defaultHouseConfig: HouseConfig = {
+  names: ['Red', 'Blue', 'Yellow', 'Green'],
 };
 
 function generateId() {
@@ -219,12 +270,12 @@ const defaultClasses: ClassConfig[] = [
 ];
 
 const sampleStudents: Student[] = [
-  { id: generateId(), name: 'Aarav Sharma', rollNo: '1001', className: 'Class 5', section: 'A', gender: 'Male', dob: '2014-03-15', guardianName: 'Rajesh Sharma', phone: '9876543210', email: 'rajesh@email.com', address: '12 MG Road, City', admissionDate: '2020-04-01', status: 'Active' },
-  { id: generateId(), name: 'Priya Patel', rollNo: '1002', className: 'Class 5', section: 'A', gender: 'Female', dob: '2014-06-22', guardianName: 'Sunil Patel', phone: '9876543211', email: 'sunil@email.com', address: '45 Park Street', admissionDate: '2020-04-01', status: 'Active' },
-  { id: generateId(), name: 'Rohan Gupta', rollNo: '1003', className: 'Class 7', section: 'B', gender: 'Male', dob: '2012-11-08', guardianName: 'Amit Gupta', phone: '9876543212', email: 'amit@email.com', address: '78 Lake View', admissionDate: '2019-04-01', status: 'Active' },
-  { id: generateId(), name: 'Sneha Reddy', rollNo: '1004', className: 'Class 3', section: 'A', gender: 'Female', dob: '2016-01-30', guardianName: 'Venkat Reddy', phone: '9876543213', email: 'venkat@email.com', address: '23 Hill Road', admissionDate: '2021-04-01', status: 'Active' },
-  { id: generateId(), name: 'Kabir Singh', rollNo: '1005', className: 'Class 10', section: 'A', gender: 'Male', dob: '2009-07-14', guardianName: 'Harpreet Singh', phone: '9876543214', email: 'harpreet@email.com', address: '56 Garden Lane', admissionDate: '2018-04-01', status: 'Active' },
-  { id: generateId(), name: 'Ananya Das', rollNo: '1006', className: 'Class 8', section: 'A', gender: 'Female', dob: '2011-09-25', guardianName: 'Bikram Das', phone: '9876543215', email: 'bikram@email.com', address: '90 River Road', admissionDate: '2019-04-01', status: 'Active' },
+  { id: generateId(), name: 'Aarav Sharma', rollNo: '1001', className: 'Class 5', section: 'A', gender: 'Male', dob: '2014-03-15', guardianName: 'Rajesh Sharma', phone: '9876543210', email: 'rajesh@email.com', address: '12 MG Road, City', admissionDate: '2020-04-01', status: 'Active', house: 'Red' },
+  { id: generateId(), name: 'Priya Patel', rollNo: '1002', className: 'Class 5', section: 'A', gender: 'Female', dob: '2014-06-22', guardianName: 'Sunil Patel', phone: '9876543211', email: 'sunil@email.com', address: '45 Park Street', admissionDate: '2020-04-01', status: 'Active', house: 'Blue' },
+  { id: generateId(), name: 'Rohan Gupta', rollNo: '1003', className: 'Class 7', section: 'B', gender: 'Male', dob: '2012-11-08', guardianName: 'Amit Gupta', phone: '9876543212', email: 'amit@email.com', address: '78 Lake View', admissionDate: '2019-04-01', status: 'Active', house: 'Yellow' },
+  { id: generateId(), name: 'Sneha Reddy', rollNo: '1004', className: 'Class 3', section: 'A', gender: 'Female', dob: '2016-01-30', guardianName: 'Venkat Reddy', phone: '9876543213', email: 'venkat@email.com', address: '23 Hill Road', admissionDate: '2021-04-01', status: 'Active', house: 'Green' },
+  { id: generateId(), name: 'Kabir Singh', rollNo: '1005', className: 'Class 10', section: 'A', gender: 'Male', dob: '2009-07-14', guardianName: 'Harpreet Singh', phone: '9876543214', email: 'harpreet@email.com', address: '56 Garden Lane', admissionDate: '2018-04-01', status: 'Active', house: 'Red' },
+  { id: generateId(), name: 'Ananya Das', rollNo: '1006', className: 'Class 8', section: 'A', gender: 'Female', dob: '2011-09-25', guardianName: 'Bikram Das', phone: '9876543215', email: 'bikram@email.com', address: '90 River Road', admissionDate: '2019-04-01', status: 'Active', house: 'Blue' },
 ];
 
 const sampleTeachers: Teacher[] = [
@@ -257,8 +308,8 @@ const sampleEvents: Event[] = [
 ];
 
 const sampleNotices: Notice[] = [
-  { id: generateId(), title: 'Uniform Guidelines Updated', content: 'All students must adhere to the updated uniform guidelines starting next month. Winter uniforms are mandatory from November.', date: '2025-02-10', audience: 'All', priority: 'Important' },
-  { id: generateId(), title: 'Fee Payment Reminder', content: 'Parents are reminded to clear all pending fee dues before the end of this month to avoid late charges.', date: '2025-02-12', audience: 'Parents', priority: 'Urgent' },
+  { id: generateId(), title: 'Uniform Guidelines Updated', content: 'All students must adhere to the updated uniform guidelines starting next month.', date: '2025-02-10', audience: 'All', priority: 'Important' },
+  { id: generateId(), title: 'Fee Payment Reminder', content: 'Parents are reminded to clear all pending fee dues before the end of this month.', date: '2025-02-12', audience: 'Parents', priority: 'Urgent' },
   { id: generateId(), title: 'Staff Meeting', content: 'All teaching staff to attend the monthly review meeting in the conference hall.', date: '2025-02-14', audience: 'Teachers', priority: 'Normal' },
 ];
 
@@ -312,6 +363,18 @@ export const store = {
 
   getPromotionPolicy: (): PromotionPolicy => load('promotionPolicy', defaultPromotionPolicy),
   setPromotionPolicy: (p: PromotionPolicy) => save('promotionPolicy', p),
+
+  getEventParticipations: (): EventParticipation[] => load('eventParticipations', []),
+  setEventParticipations: (p: EventParticipation[]) => save('eventParticipations', p),
+
+  getStudentItems: (): StudentItem[] => load('studentItems', []),
+  setStudentItems: (i: StudentItem[]) => save('studentItems', i),
+
+  getCertificates: (): Certificate[] => load('certificates', []),
+  setCertificates: (c: Certificate[]) => save('certificates', c),
+
+  getHouseConfig: (): HouseConfig => load('houseConfig', defaultHouseConfig),
+  setHouseConfig: (h: HouseConfig) => save('houseConfig', h),
 
   generateId,
 };
