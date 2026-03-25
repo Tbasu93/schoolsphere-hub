@@ -21,7 +21,7 @@ const categoryColors: Record<string, string> = {
 
 const emptyStudent: Omit<Student, 'id'> = {
   name: '', rollNo: '', className: '', section: '', gender: 'Male', dob: '',
-  guardianName: '', phone: '', email: '', address: '', admissionDate: '', status: 'Active',
+  guardianName: '', phone: '', email: '', address: '', admissionDate: '', status: 'Active', house: '',
 };
 
 const Students = () => {
@@ -34,6 +34,7 @@ const Students = () => {
   const [form, setForm] = useState(emptyStudent);
   const [subjectsDialogStudent, setSubjectsDialogStudent] = useState<Student | null>(null);
   const classes = store.getClasses();
+  const houseConfig = store.getHouseConfig();
 
   const save = (list: Student[]) => { setStudents(list); store.setStudents(list); };
 
@@ -44,7 +45,6 @@ const Students = () => {
     return matchSearch && matchClass && matchSection;
   });
 
-  // Get available sections for selected filter class
   const filterSections = filterClass === 'All'
     ? [...new Set(students.map(s => s.section).filter(Boolean))]
     : classes.find(c => c.name === filterClass)?.sections || [];
@@ -64,11 +64,7 @@ const Students = () => {
     setSheetOpen(false);
   };
 
-  const handleDelete = (id: string) => {
-    save(students.filter(s => s.id !== id));
-    toast.success('Student removed');
-  };
-
+  const handleDelete = (id: string) => { save(students.filter(s => s.id !== id)); toast.success('Student removed'); };
   const updateForm = (key: string, value: string) => setForm(prev => ({ ...prev, [key]: value }));
   const selectedClassSections = classes.find(c => c.name === form.className)?.sections || [];
 
@@ -80,11 +76,8 @@ const Students = () => {
 
   return (
     <div>
-      <PageHeader
-        title="Students"
-        description={`${students.length} students enrolled`}
-        actions={<Button onClick={openNew} size="sm"><Plus className="h-4 w-4 mr-1" /> Add Student</Button>}
-      />
+      <PageHeader title="Students" description={`${students.length} students enrolled`}
+        actions={<Button onClick={openNew} size="sm"><Plus className="h-4 w-4 mr-1" /> Add Student</Button>} />
 
       <div className="flex flex-col sm:flex-row gap-3 mb-4">
         <div className="relative flex-1">
@@ -115,6 +108,7 @@ const Students = () => {
               <TableHead>Roll No</TableHead>
               <TableHead>Class</TableHead>
               <TableHead>Section</TableHead>
+              <TableHead>House</TableHead>
               <TableHead>Guardian</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="w-28">Actions</TableHead>
@@ -127,6 +121,7 @@ const Students = () => {
                 <TableCell>{s.rollNo}</TableCell>
                 <TableCell>{s.className}</TableCell>
                 <TableCell>{s.section}</TableCell>
+                <TableCell>{s.house || '—'}</TableCell>
                 <TableCell>{s.guardianName}</TableCell>
                 <TableCell><Badge variant={s.status === 'Active' ? 'default' : 'secondary'} className="text-[10px]">{s.status}</Badge></TableCell>
                 <TableCell>
@@ -139,7 +134,7 @@ const Students = () => {
               </TableRow>
             ))}
             {filtered.length === 0 && (
-              <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">No students found</TableCell></TableRow>
+              <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">No students found</TableCell></TableRow>
             )}
           </TableBody>
         </Table>
@@ -148,15 +143,13 @@ const Students = () => {
       {/* Show Subjects Dialog */}
       <Dialog open={!!subjectsDialogStudent} onOpenChange={open => !open && setSubjectsDialogStudent(null)}>
         <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Subjects — {subjectsDialogStudent?.name}</DialogTitle>
-          </DialogHeader>
+          <DialogHeader><DialogTitle>Subjects — {subjectsDialogStudent?.name}</DialogTitle></DialogHeader>
           {subjectsDialogStudent && (
             <div className="space-y-3">
               <p className="text-sm text-muted-foreground">{subjectsDialogStudent.className} • Section {subjectsDialogStudent.section}</p>
               {(() => {
                 const subs = getStudentSubjects(subjectsDialogStudent);
-                if (subs.length === 0) return <p className="text-sm text-muted-foreground">No subjects configured for this section.</p>;
+                if (subs.length === 0) return <p className="text-sm text-muted-foreground">No subjects configured.</p>;
                 const grouped: Record<string, string[]> = {};
                 subs.forEach(s => { if (!grouped[s.category]) grouped[s.category] = []; grouped[s.category].push(s.name); });
                 return Object.entries(grouped).map(([cat, names]) => (
@@ -198,6 +191,16 @@ const Students = () => {
               <Select value={form.section} onValueChange={v => updateForm('section', v)}>
                 <SelectTrigger><SelectValue placeholder="Select section" /></SelectTrigger>
                 <SelectContent>{selectedClassSections.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>House</Label>
+              <Select value={form.house || ''} onValueChange={v => updateForm('house', v)}>
+                <SelectTrigger><SelectValue placeholder="Select house" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">None</SelectItem>
+                  {houseConfig.names.map(h => <SelectItem key={h} value={h}>{h}</SelectItem>)}
+                </SelectContent>
               </Select>
             </div>
             <div><Label>Date of Birth</Label><Input type="date" value={form.dob} onChange={e => updateForm('dob', e.target.value)} /></div>

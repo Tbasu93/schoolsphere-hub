@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { PageHeader } from "@/components/PageHeader";
 import { store, Exam, ExamResult, ExamSubjectConfig, SubjectMark, calculateGrade } from "@/lib/store";
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,8 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
-import { Plus, Pencil, Trash2, ClipboardList, FileText, X } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Plus, Pencil, Trash2, ClipboardList, FileText, X, ChevronDown, ChevronUp, CreditCard, BookCheck } from "lucide-react";
 import { toast } from "sonner";
 
 interface SubjectFormEntry {
@@ -24,6 +25,20 @@ interface SubjectFormEntry {
 
 const emptySubject = (): SubjectFormEntry => ({ name: '', theoryMax: 80, hasPractical: false, practicalMax: 20, practicalName: 'Project' });
 
+const getExamStatus = (exam: Exam): 'Upcoming' | 'Ongoing' | 'Finished' => {
+  if (!exam.date) return 'Upcoming';
+  const today = new Date().toISOString().split('T')[0];
+  if (exam.date > today) return 'Upcoming';
+  if (exam.date === today) return 'Ongoing';
+  return 'Finished';
+};
+
+const statusColors: Record<string, string> = {
+  Upcoming: 'bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/30',
+  Ongoing: 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30',
+  Finished: 'bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/30',
+};
+
 const Exams = () => {
   const classes = store.getClasses();
   const allStudents = store.getStudents();
@@ -33,30 +48,61 @@ const Exams = () => {
   // Exam form
   const [examSheetOpen, setExamSheetOpen] = useState(false);
   const [editExamId, setEditExamId] = useState<string | null>(null);
-  const [examForm, setExamForm] = useState({ name: '', className: '', date: '', passPercent: 35, subjects: [emptySubject()] as SubjectFormEntry[] });
+  const [examForm, setExamForm] = useState({ name: '', className: '', section: '', date: '', passPercent: 35, subjects: [emptySubject()] as SubjectFormEntry[] });
 
   // Marks entry
   const [marksSheetOpen, setMarksSheetOpen] = useState(false);
   const [selectedExam, setSelectedExam] = useState<Exam | null>(null);
-  // marksMap: studentId -> subjectName -> { theory: number, practical: number }
   const [marksMap, setMarksMap] = useState<Record<string, Record<string, { theory: number; practical: number }>>>({});
 
+  // Results inline toggle
+  const [expandedExamId, setExpandedExamId] = useState<string | null>(null);
+
   // Report card
-  const [reportStudent, setReportStudent] = useState<string>('');
+  const [reportClass, setReportClass] = useState('');
+  const [reportSection, setReportSection] = useState('');
+  const [reportStudent, setReportStudent] = useState('');
+
+  // Admit/Report card management
+  const [cardMgmtExamId, setCardMgmtExamId] = useState<string | null>(null);
+
+  // Filter
+  const [filterClass, setFilterClass] = useState('All');
+  const [filterSection, setFilterSection] = useState('All');
 
   const saveExams = (list: Exam[]) => { setExams(list); store.setExams(list); };
   const saveResults = (list: ExamResult[]) => { setResults(list); store.setExamResults(list); };
 
+  const formSections = classes.find(c => c.name === examForm.className)?.sections || [];
+
+  // Group exams by class/section
+  const groupedExams = useMemo(() => {
+    let filtered = exams;
+    if (filterClass !== 'All') filtered = filtered.filter(e => e.className === filterClass);
+    if (filterSection !== 'All') filtered = filtered.filter(e => e.section === filterSection);
+
+    const groups: Record<string, Exam[]> = {};
+    filtered.forEach(e => {
+      const key = `${e.className} - ${e.section}`;
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(e);
+    });
+    // Sort keys
+    return Object.entries(groups).sort(([a], [b]) => a.localeCompare(b));
+  }, [exams, filterClass, filterSection]);
+
+  const filterSections = filterClass === 'All' ? [] : (classes.find(c => c.name === filterClass)?.sections || []);
+
   // --- Exam CRUD ---
   const openNewExam = () => {
-    setExamForm({ name: '', className: '', date: '', passPercent: 35, subjects: [emptySubject()] });
+    setExamForm({ name: '', className: '', section: '', date: '', passPercent: 35, subjects: [emptySubject()] });
     setEditExamId(null);
     setExamSheetOpen(true);
   };
 
   const openEditExam = (e: Exam) => {
     setExamForm({
-      name: e.name, className: e.className, date: e.date, passPercent: e.passPercent,
+      name: e.name, className: e.className, section: e.section || '', date: e.date, passPercent: e.passPercent,
       subjects: e.subjects.map(s => ({ name: s.name, theoryMax: s.theoryMax, hasPractical: s.practicalMax > 0, practicalMax: s.practicalMax, practicalName: s.practicalName })),
     });
     setEditExamId(e.id);
@@ -65,18 +111,20 @@ const Exams = () => {
 
   const handleSaveExam = () => {
     const subjects: ExamSubjectConfig[] = examForm.subjects.filter(s => s.name.trim()).map(s => ({
-      name: s.name.trim(),
-      theoryMax: s.theoryMax,
+      name: s.name.trim(), theoryMax: s.theoryMax,
       practicalMax: s.hasPractical ? s.practicalMax : 0,
       practicalName: s.hasPractical ? s.practicalName : '',
     }));
-    if (!examForm.name || !examForm.className || subjects.length === 0) {
-      toast.error('Name, class, and at least one subject required');
+    if (!examForm.name || !examForm.className || !examForm.section || subjects.length === 0) {
+      toast.error('Name, class, section, and at least one subject required');
       return;
     }
-    const exam: Exam = { id: editExamId || store.generateId(), name: examForm.name, className: examForm.className, date: examForm.date, passPercent: examForm.passPercent, subjects };
+    const exam: Exam = {
+      id: editExamId || store.generateId(), name: examForm.name, className: examForm.className,
+      section: examForm.section, date: examForm.date, passPercent: examForm.passPercent, subjects,
+    };
     if (editExamId) {
-      saveExams(exams.map(e => e.id === editExamId ? exam : e));
+      saveExams(exams.map(e => e.id === editExamId ? { ...e, ...exam } : e));
       toast.success('Exam updated');
     } else {
       saveExams([...exams, exam]);
@@ -102,12 +150,24 @@ const Exams = () => {
   };
   const removeSubject = (idx: number) => setExamForm(prev => ({ ...prev, subjects: prev.subjects.filter((_, i) => i !== idx) }));
 
+  // Auto-populate subjects from class/section config
+  const autoPopulateSubjects = () => {
+    if (!examForm.className || !examForm.section) return;
+    const classConfig = classes.find(c => c.name === examForm.className);
+    const sectionSubs = classConfig?.sectionSubjects?.[examForm.section] || [];
+    if (sectionSubs.length === 0) { toast.error('No subjects configured for this section'); return; }
+    setExamForm(prev => ({
+      ...prev,
+      subjects: sectionSubs.map(s => ({ name: s.name, theoryMax: 80, hasPractical: false, practicalMax: 20, practicalName: 'Project' })),
+    }));
+    toast.success('Subjects loaded from class config');
+  };
+
   // --- Marks entry ---
   const openMarksEntry = (exam: Exam) => {
     setSelectedExam(exam);
-    const students = allStudents.filter(s => s.className === exam.className && s.status === 'Active');
+    const students = allStudents.filter(s => s.className === exam.className && s.section === exam.section && s.status === 'Active');
     const existingResults = results.filter(r => r.examId === exam.id);
-
     const map: Record<string, Record<string, { theory: number; practical: number }>> = {};
     students.forEach(s => {
       const existing = existingResults.find(r => r.studentId === s.id);
@@ -123,22 +183,16 @@ const Exams = () => {
 
   const handleSaveMarks = () => {
     if (!selectedExam) return;
-    const students = allStudents.filter(s => s.className === selectedExam.className && s.status === 'Active');
-
+    const students = allStudents.filter(s => s.className === selectedExam.className && s.section === selectedExam.section && s.status === 'Active');
     const newResults: ExamResult[] = students.map(s => {
       const marks: SubjectMark[] = selectedExam.subjects.map(sub => {
         const entry = marksMap[s.id]?.[sub.name] || { theory: 0, practical: 0 };
         const theoryObt = Math.min(entry.theory, sub.theoryMax);
         const practicalObt = Math.min(entry.practical, sub.practicalMax);
         return {
-          subject: sub.name,
-          theoryObtained: theoryObt,
-          theoryMax: sub.theoryMax,
-          practicalObtained: practicalObt,
-          practicalMax: sub.practicalMax,
-          practicalName: sub.practicalName,
-          obtained: theoryObt + practicalObt,
-          max: sub.theoryMax + sub.practicalMax,
+          subject: sub.name, theoryObtained: theoryObt, theoryMax: sub.theoryMax,
+          practicalObtained: practicalObt, practicalMax: sub.practicalMax, practicalName: sub.practicalName,
+          obtained: theoryObt + practicalObt, max: sub.theoryMax + sub.practicalMax,
         };
       });
       const totalObtained = marks.reduce((sum, m) => sum + m.obtained, 0);
@@ -146,25 +200,49 @@ const Exams = () => {
       const percentage = totalMax > 0 ? Math.round((totalObtained / totalMax) * 100 * 100) / 100 : 0;
       const grade = calculateGrade(percentage);
       const failedAny = marks.some(m => m.max > 0 && ((m.obtained / m.max) * 100) < selectedExam.passPercent);
-
       return {
         id: store.generateId(), examId: selectedExam.id, studentId: s.id, studentName: s.name,
-        className: selectedExam.className, marks, totalObtained, totalMax, percentage, grade,
+        className: selectedExam.className, section: selectedExam.section, marks, totalObtained, totalMax, percentage, grade,
         status: failedAny ? 'Fail' as const : 'Pass' as const,
       };
     });
-
     const otherResults = results.filter(r => r.examId !== selectedExam.id);
     saveResults([...otherResults, ...newResults]);
     toast.success('Marks saved successfully');
     setMarksSheetOpen(false);
   };
 
-  // Report card
-  const studentResults = results.filter(r => r.studentId === reportStudent);
-  const reportStudentInfo = allStudents.find(s => s.id === reportStudent);
+  // Admit/Report card toggle
+  const toggleAdmitCard = (examId: string, studentId: string) => {
+    saveExams(exams.map(e => {
+      if (e.id !== examId) return e;
+      const issued = { ...(e.admitCardIssued || {}) };
+      issued[studentId] = !issued[studentId];
+      return { ...e, admitCardIssued: issued };
+    }));
+  };
 
-  const totalMarks = (sub: ExamSubjectConfig) => sub.theoryMax + sub.practicalMax;
+  const toggleReportCard = (examId: string, studentId: string) => {
+    saveExams(exams.map(e => {
+      if (e.id !== examId) return e;
+      const issued = { ...(e.reportCardIssued || {}) };
+      issued[studentId] = !issued[studentId];
+      return { ...e, reportCardIssued: issued };
+    }));
+  };
+
+  // Report card data
+  const reportStudents = useMemo(() => {
+    let filtered = allStudents.filter(s => s.status === 'Active');
+    if (reportClass) filtered = filtered.filter(s => s.className === reportClass);
+    if (reportSection) filtered = filtered.filter(s => s.section === reportSection);
+    return filtered;
+  }, [allStudents, reportClass, reportSection]);
+
+  const reportSections = reportClass ? (classes.find(c => c.name === reportClass)?.sections || []) : [];
+
+  const selectedReportStudent = reportStudent ? allStudents.find(s => s.id === reportStudent) : null;
+  const studentResults = results.filter(r => r.studentId === reportStudent);
 
   return (
     <div>
@@ -177,42 +255,155 @@ const Exams = () => {
         </TabsList>
 
         <TabsContent value="exams">
-          <div className="flex justify-end mb-4">
+          <div className="flex flex-wrap gap-3 mb-4 items-center">
+            <Select value={filterClass} onValueChange={v => { setFilterClass(v); setFilterSection('All'); }}>
+              <SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="All">All Classes</SelectItem>
+                {classes.map(c => <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            {filterClass !== 'All' && (
+              <Select value={filterSection} onValueChange={setFilterSection}>
+                <SelectTrigger className="w-[140px]"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="All">All Sections</SelectItem>
+                  {filterSections.map(s => <SelectItem key={s} value={s}>Section {s}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            )}
+            <div className="flex-1" />
             <Button onClick={openNewExam} size="sm"><Plus className="h-4 w-4 mr-1" /> Create Exam</Button>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {exams.map(e => (
-              <Card key={e.id} className="group">
-                <CardHeader className="pb-2 flex flex-row items-center justify-between">
-                  <CardTitle className="text-base font-heading">{e.name}</CardTitle>
-                  <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openMarksEntry(e)}><ClipboardList className="h-3 w-3" /></Button>
-                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEditExam(e)}><Pencil className="h-3 w-3" /></Button>
-                    <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => deleteExam(e.id)}><Trash2 className="h-3 w-3" /></Button>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-1 text-sm text-muted-foreground">
-                    <p>Class: <span className="text-foreground font-medium">{e.className}</span></p>
-                    <p>Date: {e.date ? new Date(e.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}</p>
-                    <p>Pass: {e.passPercent}% per subject</p>
-                    <div className="flex flex-wrap gap-1 mt-2">
-                      {e.subjects.map(s => (
-                        <Badge key={s.name} variant="secondary" className="text-[10px]">
-                          {s.name} ({totalMarks(s)}{s.practicalMax > 0 ? ` = ${s.theoryMax}T+${s.practicalMax} ${s.practicalName}` : ''})
-                        </Badge>
-                      ))}
+          {groupedExams.length === 0 && <p className="text-muted-foreground text-center py-12">No exams found</p>}
+
+          {groupedExams.map(([groupLabel, groupExams]) => (
+            <div key={groupLabel} className="mb-6">
+              <h3 className="font-heading font-semibold text-sm mb-3 text-muted-foreground">{groupLabel}</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {groupExams.map(e => {
+                  const status = getExamStatus(e);
+                  const examResults = results.filter(r => r.examId === e.id);
+                  const hasResults = examResults.length > 0;
+                  const examStudents = allStudents.filter(s => s.className === e.className && s.section === e.section && s.status === 'Active');
+                  const admitIssued = examStudents.filter(s => e.admitCardIssued?.[s.id]).length;
+                  const reportIssued = examStudents.filter(s => e.reportCardIssued?.[s.id]).length;
+
+                  return (
+                    <div key={e.id}>
+                      <Card className="group">
+                        <CardHeader className="pb-2 flex flex-row items-start justify-between">
+                          <div className="space-y-1">
+                            <CardTitle className="text-base font-heading">{e.name}</CardTitle>
+                            <Badge variant="outline" className={`text-[10px] ${statusColors[status]}`}>{status}</Badge>
+                          </div>
+                          <div className="flex gap-1">
+                            <Button variant="ghost" size="icon" className="h-7 w-7" title="Enter Marks" onClick={() => openMarksEntry(e)}><ClipboardList className="h-3 w-3" /></Button>
+                            <Button variant="ghost" size="icon" className="h-7 w-7" title="Admit/Report Cards" onClick={() => setCardMgmtExamId(cardMgmtExamId === e.id ? null : e.id)}><CreditCard className="h-3 w-3" /></Button>
+                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEditExam(e)}><Pencil className="h-3 w-3" /></Button>
+                            <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => deleteExam(e.id)}><Trash2 className="h-3 w-3" /></Button>
+                          </div>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="space-y-1 text-sm text-muted-foreground">
+                            <p>Class: <span className="text-foreground font-medium">{e.className} - {e.section}</span></p>
+                            <p>Date: {e.date ? new Date(e.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}</p>
+                            <p>Pass: {e.passPercent}% | Subjects: {e.subjects.length}</p>
+                            <div className="flex gap-2 mt-2 flex-wrap">
+                              <Badge variant="outline" className="text-[10px]">
+                                <CreditCard className="h-3 w-3 mr-1" /> Admit: {admitIssued}/{examStudents.length}
+                              </Badge>
+                              <Badge variant="outline" className="text-[10px]">
+                                <BookCheck className="h-3 w-3 mr-1" /> Report: {reportIssued}/{examStudents.length}
+                              </Badge>
+                            </div>
+                            {hasResults && (
+                              <Button
+                                variant="outline" size="sm" className="mt-2 w-full text-xs gap-1"
+                                onClick={() => setExpandedExamId(expandedExamId === e.id ? null : e.id)}
+                              >
+                                Results Entered
+                                {expandedExamId === e.id ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                              </Button>
+                            )}
+                          </div>
+                        </CardContent>
+                      </Card>
+
+                      {/* Inline results table */}
+                      {expandedExamId === e.id && hasResults && (
+                        <Card className="mt-2 border-dashed">
+                          <CardContent className="p-0">
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead>Student</TableHead>
+                                  {e.subjects.map(sub => <TableHead key={sub.name} className="text-center text-xs">{sub.name}<br /><span className="text-muted-foreground">({sub.theoryMax + sub.practicalMax})</span></TableHead>)}
+                                  <TableHead className="text-center">Total</TableHead>
+                                  <TableHead className="text-center">%</TableHead>
+                                  <TableHead className="text-center">Status</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {examResults.map(r => (
+                                  <TableRow key={r.id}>
+                                    <TableCell className="font-medium text-xs">{r.studentName}</TableCell>
+                                    {e.subjects.map(sub => {
+                                      const m = r.marks.find(mk => mk.subject === sub.name);
+                                      return <TableCell key={sub.name} className="text-center text-xs">{m ? m.obtained : '—'}</TableCell>;
+                                    })}
+                                    <TableCell className="text-center text-xs font-medium">{r.totalObtained}/{r.totalMax}</TableCell>
+                                    <TableCell className="text-center text-xs">{r.percentage}%</TableCell>
+                                    <TableCell className="text-center">
+                                      <Badge variant={r.status === 'Pass' ? 'default' : 'destructive'} className="text-[10px]">{r.status}</Badge>
+                                    </TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          </CardContent>
+                        </Card>
+                      )}
+
+                      {/* Card management */}
+                      {cardMgmtExamId === e.id && (
+                        <Card className="mt-2 border-dashed">
+                          <CardHeader className="py-2 px-4">
+                            <CardTitle className="text-sm">Admit & Report Card Status</CardTitle>
+                          </CardHeader>
+                          <CardContent className="p-0">
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead>Student</TableHead>
+                                  <TableHead className="text-center">Admit Card</TableHead>
+                                  <TableHead className="text-center">Report Card</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {examStudents.map(s => (
+                                  <TableRow key={s.id}>
+                                    <TableCell className="text-xs font-medium">{s.name} ({s.rollNo})</TableCell>
+                                    <TableCell className="text-center">
+                                      <Checkbox checked={!!e.admitCardIssued?.[s.id]} onCheckedChange={() => toggleAdmitCard(e.id, s.id)} />
+                                    </TableCell>
+                                    <TableCell className="text-center">
+                                      <Checkbox checked={!!e.reportCardIssued?.[s.id]} onCheckedChange={() => toggleReportCard(e.id, s.id)} />
+                                    </TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          </CardContent>
+                        </Card>
+                      )}
                     </div>
-                    {results.filter(r => r.examId === e.id).length > 0 && (
-                      <Badge variant="default" className="mt-2 text-[10px]">Results entered</Badge>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-            {exams.length === 0 && <p className="text-muted-foreground col-span-full text-center py-12">No exams created yet</p>}
-          </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </TabsContent>
 
         <TabsContent value="report">
@@ -223,24 +414,45 @@ const Exams = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="mb-4">
-                <Label>Select Student</Label>
-                <Select value={reportStudent} onValueChange={setReportStudent}>
-                  <SelectTrigger><SelectValue placeholder="Choose a student" /></SelectTrigger>
-                  <SelectContent>
-                    {allStudents.filter(s => s.status === 'Active').map(s => (
-                      <SelectItem key={s.id} value={s.id}>{s.name} ({s.className} - {s.section})</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              <div className="flex flex-wrap gap-3 mb-4">
+                <div className="flex-1 min-w-[150px]">
+                  <Label>Class</Label>
+                  <Select value={reportClass} onValueChange={v => { setReportClass(v); setReportSection(''); setReportStudent(''); }}>
+                    <SelectTrigger><SelectValue placeholder="Select class" /></SelectTrigger>
+                    <SelectContent>{classes.map(c => <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+                {reportClass && (
+                  <div className="flex-1 min-w-[120px]">
+                    <Label>Section</Label>
+                    <Select value={reportSection} onValueChange={v => { setReportSection(v); setReportStudent(''); }}>
+                      <SelectTrigger><SelectValue placeholder="All Sections" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all_sec">All</SelectItem>
+                        {reportSections.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+                <div className="flex-1 min-w-[200px]">
+                  <Label>Student</Label>
+                  <Select value={reportStudent} onValueChange={setReportStudent}>
+                    <SelectTrigger><SelectValue placeholder="Choose a student" /></SelectTrigger>
+                    <SelectContent>
+                      {reportStudents.map(s => (
+                        <SelectItem key={s.id} value={s.id}>{s.name} ({s.className} - {s.section})</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
 
-              {reportStudent && reportStudentInfo && (
+              {reportStudent && selectedReportStudent && (
                 <div className="space-y-6">
                   <div className="p-4 rounded-lg bg-muted/50 space-y-1 text-sm">
-                    <p className="font-heading font-bold text-lg">{reportStudentInfo.name}</p>
-                    <p>Roll No: {reportStudentInfo.rollNo} | Class: {reportStudentInfo.className} - {reportStudentInfo.section}</p>
-                    <p>Guardian: {reportStudentInfo.guardianName}</p>
+                    <p className="font-heading font-bold text-lg">{selectedReportStudent.name}</p>
+                    <p>Roll No: {selectedReportStudent.rollNo} | Class: {selectedReportStudent.className} - {selectedReportStudent.section}</p>
+                    <p>Guardian: {selectedReportStudent.guardianName}</p>
                   </div>
 
                   {studentResults.length === 0 ? (
@@ -313,18 +525,32 @@ const Exams = () => {
           <SheetHeader><SheetTitle>{editExamId ? 'Edit Exam' : 'Create Exam'}</SheetTitle></SheetHeader>
           <div className="space-y-4 mt-6">
             <div><Label>Exam Name *</Label><Input value={examForm.name} onChange={e => setExamForm(prev => ({ ...prev, name: e.target.value }))} placeholder="e.g. Mid-Term 2025" /></div>
-            <div>
-              <Label>Class *</Label>
-              <Select value={examForm.className} onValueChange={v => setExamForm(prev => ({ ...prev, className: v }))}>
-                <SelectTrigger><SelectValue placeholder="Select class" /></SelectTrigger>
-                <SelectContent>{classes.map(c => <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>)}</SelectContent>
-              </Select>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Class *</Label>
+                <Select value={examForm.className} onValueChange={v => setExamForm(prev => ({ ...prev, className: v, section: '' }))}>
+                  <SelectTrigger><SelectValue placeholder="Select class" /></SelectTrigger>
+                  <SelectContent>{classes.map(c => <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Section *</Label>
+                <Select value={examForm.section} onValueChange={v => setExamForm(prev => ({ ...prev, section: v }))}>
+                  <SelectTrigger><SelectValue placeholder="Select section" /></SelectTrigger>
+                  <SelectContent>{formSections.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
             </div>
             <div><Label>Date</Label><Input type="date" value={examForm.date} onChange={e => setExamForm(prev => ({ ...prev, date: e.target.value }))} /></div>
             <div><Label>Pass % per subject</Label><Input type="number" min={0} max={100} value={examForm.passPercent} onChange={e => setExamForm(prev => ({ ...prev, passPercent: Number(e.target.value) }))} /></div>
 
             <div>
-              <Label className="mb-2 block">Subjects & Mark Components</Label>
+              <div className="flex items-center justify-between mb-2">
+                <Label>Subjects & Mark Components</Label>
+                {examForm.className && examForm.section && (
+                  <Button variant="outline" size="sm" className="text-xs" onClick={autoPopulateSubjects}>Auto-fill from Config</Button>
+                )}
+              </div>
               <div className="space-y-3">
                 {examForm.subjects.map((sub, i) => (
                   <div key={i} className="border rounded-lg p-3 space-y-2 bg-muted/30">
@@ -371,9 +597,9 @@ const Exams = () => {
           <SheetHeader><SheetTitle>Enter Marks — {selectedExam?.name}</SheetTitle></SheetHeader>
           {selectedExam && (
             <div className="mt-4">
-              <p className="text-sm text-muted-foreground mb-4">{selectedExam.className} | Pass: {selectedExam.passPercent}% per subject</p>
+              <p className="text-sm text-muted-foreground mb-4">{selectedExam.className} - {selectedExam.section} | Pass: {selectedExam.passPercent}% per subject</p>
               <div className="space-y-4">
-                {allStudents.filter(s => s.className === selectedExam.className && s.status === 'Active').map(student => (
+                {allStudents.filter(s => s.className === selectedExam.className && s.section === selectedExam.section && s.status === 'Active').map(student => (
                   <div key={student.id} className="border rounded-lg p-3">
                     <p className="font-medium text-sm mb-2">{student.name} ({student.rollNo})</p>
                     <div className="grid grid-cols-1 gap-2">
