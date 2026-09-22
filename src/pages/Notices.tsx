@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Plus, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import BulkUpload from "@/components/BulkUpload";
 
 const emptyNotice: Omit<Notice, 'id'> = { title: '', content: '', date: '', audience: 'All', priority: 'Normal' };
 
@@ -42,9 +43,15 @@ const Notices = () => {
   const handleDelete = (id: string) => { save(notices.filter(n => n.id !== id)); toast.success('Notice removed'); };
   const updateForm = (key: string, value: string) => setForm(prev => ({ ...prev, [key]: value }));
 
+  const importNotices = (rows: Record<string, string>[]) => {
+    const imported: Notice[] = rows.map(row => ({ id: store.generateId(), title: row.title, content: row.content || '', date: row.date || '', audience: ['All', 'Students', 'Teachers', 'Parents'].includes(row.audience) ? row.audience as Notice['audience'] : 'All', priority: ['Normal', 'Important', 'Urgent'].includes(row.priority) ? row.priority as Notice['priority'] : 'Normal' }));
+    save([...notices, ...imported]);
+    return { imported: imported.length };
+  };
+
   return (
     <div>
-      <PageHeader title="Notices" description="Publish and manage school notices" actions={<Button onClick={openNew} size="sm"><Plus className="h-4 w-4 mr-1" /> New Notice</Button>} />
+      <PageHeader title="Notices" description="Publish and manage school notices" actions={<><BulkUpload title="notices" fields={[{ key: 'title', label: 'Title', required: true }, { key: 'content', label: 'Content', required: true }, { key: 'date', label: 'Date' }, { key: 'audience', label: 'Audience' }, { key: 'priority', label: 'Priority' }]} sampleRows={[{ title: 'Fee Reminder', content: 'Please clear pending dues.', date: '2026-04-01', audience: 'Parents', priority: 'Important' }]} onImport={importNotices} /><Button onClick={openNew} size="sm"><Plus className="h-4 w-4 mr-1" /> New Notice</Button></>} />
 
       <div className="space-y-3">
         {notices.map(n => (

@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Plus, Search, Pencil, Trash2, BookOpen } from "lucide-react";
 import { toast } from "sonner";
+import BulkUpload from "@/components/BulkUpload";
 
 const categoryColors: Record<string, string> = {
   'Core': 'bg-primary/10 text-primary border-primary/20',
@@ -68,6 +69,21 @@ const Students = () => {
   const updateForm = (key: string, value: string) => setForm(prev => ({ ...prev, [key]: value }));
   const selectedClassSections = classes.find(c => c.name === form.className)?.sections || [];
 
+  const importStudents = (rows: Record<string, string>[]) => {
+    const errors: string[] = [];
+    const imported = rows.flatMap((row, index) => {
+      const classConfig = classes.find(c => c.name === row.className);
+      if (!classConfig) { errors.push(`Row ${index + 2}: class “${row.className || 'blank'}” was not found`); return []; }
+      if (row.section && !classConfig.sections.includes(row.section)) { errors.push(`Row ${index + 2}: section “${row.section}” is not configured for ${row.className}`); return []; }
+      const gender = ['Male', 'Female', 'Other'].includes(row.gender) ? row.gender as Student['gender'] : 'Male';
+      const status = row.status === 'Inactive' ? 'Inactive' : 'Active';
+      return [{ id: store.generateId(), name: row.name, rollNo: row.rollNo || '', className: row.className, section: row.section || classConfig.sections[0] || '', gender, dob: row.dob || '', guardianName: row.guardianName || '', phone: row.phone || '', email: row.email || '', address: row.address || '', admissionDate: row.admissionDate || '', status, house: row.house || '' }];
+    });
+    if (errors.length === rows.length) return { imported: 0, errors };
+    save([...students, ...imported]);
+    return { imported: imported.length, skipped: rows.length - imported.length, errors };
+  };
+
   const getStudentSubjects = (s: Student): SubjectEntry[] => {
     const classConfig = classes.find(c => c.name === s.className);
     if (!classConfig) return [];
@@ -77,7 +93,7 @@ const Students = () => {
   return (
     <div>
       <PageHeader title="Students" description={`${students.length} students enrolled`}
-        actions={<Button onClick={openNew} size="sm"><Plus className="h-4 w-4 mr-1" /> Add Student</Button>} />
+        actions={<><BulkUpload title="students" description="Add one student per row. Class and section must match your configuration." fields={[{ key: 'name', label: 'Name', required: true }, { key: 'rollNo', label: 'Roll No' }, { key: 'className', label: 'Class', required: true }, { key: 'section', label: 'Section' }, { key: 'gender', label: 'Gender' }, { key: 'dob', label: 'Date of Birth' }, { key: 'guardianName', label: 'Guardian Name' }, { key: 'phone', label: 'Phone' }, { key: 'email', label: 'Email' }, { key: 'address', label: 'Address' }, { key: 'admissionDate', label: 'Admission Date' }, { key: 'status', label: 'Status' }, { key: 'house', label: 'House' }]} sampleRows={[{ name: 'Riya Sharma', rollNo: '2001', className: 'Class 5', section: 'A', gender: 'Female', guardianName: 'Parent Name', status: 'Active' }]} onImport={importStudents} /><Button onClick={openNew} size="sm"><Plus className="h-4 w-4 mr-1" /> Add Student</Button></>} />
 
       <div className="flex flex-col sm:flex-row gap-3 mb-4">
         <div className="relative flex-1">

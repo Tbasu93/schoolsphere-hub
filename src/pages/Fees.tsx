@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import BulkUpload from "@/components/BulkUpload";
 
 const emptyFee: Omit<FeeStructure, 'id'> = {
   className: '', feeType: '', amount: 0, dueDate: '', frequency: 'Monthly',
@@ -41,9 +42,21 @@ const Fees = () => {
   const handleDelete = (id: string) => { save(fees.filter(f => f.id !== id)); toast.success('Fee removed'); };
   const updateForm = (key: string, value: string | number) => setForm(prev => ({ ...prev, [key]: value }));
 
+  const importFees = (rows: Record<string, string>[]) => {
+    const errors: string[] = [];
+    const imported = rows.flatMap((row, index) => {
+      const amount = Number(row.amount);
+      if (!Number.isFinite(amount)) { errors.push(`Row ${index + 2}: amount must be a number`); return []; }
+      const frequency = ['Monthly', 'Quarterly', 'Annually', 'One-time'].includes(row.frequency) ? row.frequency as FeeStructure['frequency'] : 'Monthly';
+      return [{ id: store.generateId(), className: row.className || 'All Classes', feeType: row.feeType, amount, dueDate: row.dueDate || '', frequency }];
+    });
+    save([...fees, ...imported]);
+    return { imported: imported.length, skipped: rows.length - imported.length, errors };
+  };
+
   return (
     <div>
-      <PageHeader title="Fee Management" description="Configure fee structures" actions={<Button onClick={openNew} size="sm"><Plus className="h-4 w-4 mr-1" /> Add Fee</Button>} />
+      <PageHeader title="Fee Management" description="Configure fee structures" actions={<><BulkUpload title="fee structures" fields={[{ key: 'feeType', label: 'Fee Type', required: true }, { key: 'className', label: 'Class' }, { key: 'amount', label: 'Amount', required: true }, { key: 'frequency', label: 'Frequency' }, { key: 'dueDate', label: 'Due Date' }]} sampleRows={[{ feeType: 'Tuition Fee', className: 'All Classes', amount: '5000', frequency: 'Monthly', dueDate: '2026-04-10' }]} onImport={importFees} /><Button onClick={openNew} size="sm"><Plus className="h-4 w-4 mr-1" /> Add Fee</Button></>} />
 
       <div className="rounded-lg border bg-card">
         <Table>
