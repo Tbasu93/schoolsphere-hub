@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Search, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import BulkUpload from "@/components/BulkUpload";
 
 const emptyStaff: Omit<StaffType, 'id'> = {
   name: '', employeeId: '', role: '', department: '', phone: '', email: '', joinDate: '', status: 'Active',
@@ -42,9 +43,15 @@ const StaffPage = () => {
   const handleDelete = (id: string) => { save(staffList.filter(s => s.id !== id)); toast.success('Staff removed'); };
   const updateForm = (key: string, value: string) => setForm(prev => ({ ...prev, [key]: value }));
 
+  const importStaff = (rows: Record<string, string>[]) => {
+    const imported: StaffType[] = rows.map(row => ({ id: store.generateId(), name: row.name, employeeId: row.employeeId || '', role: row.role || '', department: row.department || '', phone: row.phone || '', email: row.email || '', joinDate: row.joinDate || '', status: row.status === 'Inactive' ? 'Inactive' : 'Active' }));
+    save([...staffList, ...imported]);
+    return { imported: imported.length };
+  };
+
   return (
     <div>
-      <PageHeader title="Non-Teaching Staff" description={`${staffList.length} staff members`} actions={<Button onClick={openNew} size="sm"><Plus className="h-4 w-4 mr-1" /> Add Staff</Button>} />
+      <PageHeader title="Non-Teaching Staff" description={`${staffList.length} staff members`} actions={<><BulkUpload title="staff" fields={[{ key: 'name', label: 'Name', required: true }, { key: 'employeeId', label: 'Employee ID' }, { key: 'role', label: 'Role' }, { key: 'department', label: 'Department' }, { key: 'joinDate', label: 'Join Date' }, { key: 'phone', label: 'Phone' }, { key: 'email', label: 'Email' }, { key: 'status', label: 'Status' }]} sampleRows={[{ name: 'Mohan Das', employeeId: 'S004', role: 'Accountant', department: 'Administration', status: 'Active' }]} onImport={importStaff} /><Button onClick={openNew} size="sm"><Plus className="h-4 w-4 mr-1" /> Add Staff</Button></>} />
 
       <div className="relative mb-4 max-w-md">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />

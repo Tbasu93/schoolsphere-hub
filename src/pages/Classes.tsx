@@ -12,6 +12,7 @@ import { Plus, Pencil, Trash2, X, BookOpen } from "lucide-react";
 import { toast } from "sonner";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import BulkUpload from "@/components/BulkUpload";
 
 const categoryColors: Record<string, string> = {
   'Core': 'bg-primary/10 text-primary border-primary/20',
@@ -118,9 +119,32 @@ const Classes = () => {
 
   const handleDelete = (id: string) => { save(classes.filter(c => c.id !== id)); toast.success('Class removed'); };
 
+  const importClasses = (rows: Record<string, string>[]) => {
+    const errors: string[] = [];
+    const grouped = new Map<string, ClassConfig>();
+    rows.forEach((row, index) => {
+      if (!row.className || !row.section) { errors.push(`Row ${index + 2}: Class and Section are required`); return; }
+      const key = row.className.trim();
+      const entry = grouped.get(key) || { id: store.generateId(), name: key, sections: [], sectionSubjects: {} };
+      const section = row.section.trim().toUpperCase();
+      if (!entry.sections.includes(section)) entry.sections.push(section);
+      if (!entry.sectionSubjects[section]) entry.sectionSubjects[section] = [];
+      if (row.subject) {
+        const category: SubjectEntry['category'] = ['Core', '2nd Language', '3rd Language', 'Additional'].includes(row.category) ? row.category as SubjectEntry['category'] : 'Core';
+        if (!entry.sectionSubjects[section].some(subject => subject.name.toLowerCase() === row.subject.toLowerCase() && subject.category === category)) entry.sectionSubjects[section].push({ name: row.subject.trim(), category });
+      }
+      grouped.set(key, entry);
+    });
+    const imported = Array.from(grouped.values());
+    const merged = [...classes];
+    imported.forEach(item => { const existingIndex = merged.findIndex(c => c.name.toLowerCase() === item.name.toLowerCase()); if (existingIndex >= 0) merged[existingIndex] = { ...merged[existingIndex], sections: [...new Set([...merged[existingIndex].sections, ...item.sections])], sectionSubjects: { ...merged[existingIndex].sectionSubjects, ...item.sectionSubjects } }; else merged.push(item); });
+    if (imported.length) save(merged);
+    return { imported: imported.length, skipped: rows.length - imported.length, errors };
+  };
+
   return (
     <div>
-      <PageHeader title="Classes & Sections" description="Configure class structure and section-wise subjects" actions={<Button onClick={openNew} size="sm"><Plus className="h-4 w-4 mr-1" /> Add Class</Button>} />
+      <PageHeader title="Classes & Sections" description="Configure class structure and section-wise subjects" actions={<><BulkUpload title="classes and sections" description="Use one row per class, section, and subject. Repeat a class/section for multiple subjects." fields={[{ key: 'className', label: 'Class', required: true }, { key: 'section', label: 'Section', required: true }, { key: 'subject', label: 'Subject' }, { key: 'category', label: 'Category' }]} sampleRows={[{ className: 'Class 1', section: 'A', subject: 'English', category: 'Core' }, { className: 'Class 1', section: 'A', subject: 'Hindi', category: '2nd Language' }]} onImport={importClasses} /><Button onClick={openNew} size="sm"><Plus className="h-4 w-4 mr-1" /> Add Class</Button></>} />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {classes.map(c => (

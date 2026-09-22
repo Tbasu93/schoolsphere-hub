@@ -1,0 +1,4 @@
+- [ ] Add reusable CSV/Excel bulk uploader with preview, validation, and templates
+- [ ] Connect uploader to students, teachers, staff, classes/sections, events, awards, and houses
+- [ ] Connect uploader to additional suitable list forms: fees, notices, items, certificates, exams, attendance, routine
+- [ ] Verify build and preview interactions

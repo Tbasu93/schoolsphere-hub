@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Plus, Trash2, Search, Home } from "lucide-react";
 import { toast } from "sonner";
+import BulkUpload from "@/components/BulkUpload";
 
 const houseColors: Record<string, string> = {
   Red: 'bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/30',
@@ -43,6 +44,13 @@ const Houses = () => {
     toast.success('House removed');
   };
 
+  const importHouses = (rows: Record<string, string>[]) => {
+    const names = rows.map(row => row.name.trim()).filter(Boolean);
+    const merged = [...houseConfig.names, ...names.filter(name => !houseConfig.names.includes(name))];
+    saveConfig({ names: merged });
+    return { imported: merged.length - houseConfig.names.length, skipped: rows.length - (merged.length - houseConfig.names.length) };
+  };
+
   const filteredStudents = useMemo(() => {
     return allStudents.filter(s => {
       if (search && !s.name.toLowerCase().includes(search.toLowerCase())) return false;
@@ -65,7 +73,7 @@ const Houses = () => {
 
   return (
     <div>
-      <PageHeader title="House Management" description="Manage houses and view student assignments" />
+      <PageHeader title="House Management" description="Manage houses and view student assignments" actions={<BulkUpload title="houses" fields={[{ key: 'name', label: 'House Name', required: true }]} sampleRows={[{ name: 'Red' }, { name: 'Blue' }]} onImport={importHouses} />} />
 
       {/* House config */}
       <Card className="mb-6">

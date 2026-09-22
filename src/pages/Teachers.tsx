@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Plus, Search, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import BulkUpload from "@/components/BulkUpload";
 
 const emptyTeacher: Omit<Teacher, 'id'> = {
   name: '', employeeId: '', subject: '', phone: '', email: '', qualification: '', joinDate: '', status: 'Active',
@@ -45,6 +46,12 @@ const Teachers = () => {
   const handleDelete = (id: string) => { save(teachers.filter(t => t.id !== id)); toast.success('Teacher removed'); };
   const updateForm = (key: string, value: string) => setForm(prev => ({ ...prev, [key]: value }));
 
+  const importTeachers = (rows: Record<string, string>[]) => {
+    const imported: Teacher[] = rows.map(row => ({ id: store.generateId(), name: row.name, employeeId: row.employeeId || '', subject: row.subject || '', phone: row.phone || '', email: row.email || '', qualification: row.qualification || '', joinDate: row.joinDate || '', status: row.status === 'Inactive' ? 'Inactive' : 'Active' }));
+    save([...teachers, ...imported]);
+    return { imported: imported.length };
+  };
+
   // Build teacher → subject → class mapping from routine
   const teacherSubjectMap = useMemo(() => {
     const map: Record<string, { subject: string; classSection: string }[]> = {};
@@ -60,7 +67,7 @@ const Teachers = () => {
 
   return (
     <div>
-      <PageHeader title="Teachers" description={`${teachers.length} teachers`} actions={<Button onClick={openNew} size="sm"><Plus className="h-4 w-4 mr-1" /> Add Teacher</Button>} />
+      <PageHeader title="Teachers" description={`${teachers.length} teachers`} actions={<><BulkUpload title="teachers" fields={[{ key: 'name', label: 'Name', required: true }, { key: 'employeeId', label: 'Employee ID' }, { key: 'subject', label: 'Subject' }, { key: 'qualification', label: 'Qualification' }, { key: 'joinDate', label: 'Join Date' }, { key: 'phone', label: 'Phone' }, { key: 'email', label: 'Email' }, { key: 'status', label: 'Status' }]} sampleRows={[{ name: 'Anita Sen', employeeId: 'T006', subject: 'English', status: 'Active' }]} onImport={importTeachers} /><Button onClick={openNew} size="sm"><Plus className="h-4 w-4 mr-1" /> Add Teacher</Button></>} />
 
       <Tabs defaultValue="list">
         <TabsList className="mb-4">

@@ -13,6 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Plus, Pencil, Trash2, CalendarDays, Trophy, Search } from "lucide-react";
 import { toast } from "sonner";
+import BulkUpload from "@/components/BulkUpload";
 
 const emptyEvent: Omit<Event, 'id'> = { title: '', date: '', type: 'Event', description: '' };
 const typeColors: Record<string, string> = { Event: 'default', Holiday: 'destructive', Exam: 'secondary' };
@@ -76,6 +77,28 @@ const EventsAwards = () => {
 
   const deleteParticipation = (id: string) => { saveParticipations(participations.filter(p => p.id !== id)); toast.success('Removed'); };
 
+  const importEvents = (rows: Record<string, string>[]) => {
+    const errors: string[] = [];
+    const imported = rows.flatMap((row, index) => {
+      if (!['Event', 'Holiday', 'Exam'].includes(row.type || 'Event')) { errors.push(`Row ${index + 2}: type must be Event, Holiday, or Exam`); return []; }
+      return [{ id: store.generateId(), title: row.title, date: row.date || '', type: (row.type || 'Event') as Event['type'], description: row.description || '' }];
+    });
+    saveEvents([...events, ...imported]);
+    return { imported: imported.length, skipped: rows.length - imported.length, errors };
+  };
+
+  const importAwards = (rows: Record<string, string>[]) => {
+    const errors: string[] = [];
+    const imported = rows.flatMap((row, index) => {
+      const event = events.find(item => item.title.toLowerCase() === (row.event || '').toLowerCase());
+      const student = allStudents.find(item => item.name.toLowerCase() === (row.studentName || '').toLowerCase());
+      if (!event || !student) { errors.push(`Row ${index + 2}: event title and student name must match existing records`); return []; }
+      return [{ id: store.generateId(), eventId: event.id, studentId: student.id, studentName: student.name, className: student.className, section: student.section, category: row.category || '', achievement: row.achievement || '', status: row.status === 'Awarded' ? 'Awarded' as const : 'Participated' as const }];
+    });
+    saveParticipations([...participations, ...imported]);
+    return { imported: imported.length, skipped: rows.length - imported.length, errors };
+  };
+
   // Unique achievements and categories for filtering
   const uniqueAchievements = [...new Set(participations.map(p => p.achievement).filter(Boolean))];
 
@@ -104,7 +127,7 @@ const EventsAwards = () => {
               <Button key={t} variant={filterType === t ? 'default' : 'outline'} size="sm" onClick={() => setFilterType(t)}>{t}</Button>
             ))}
             <div className="flex-1" />
-            <Button onClick={openNew} size="sm"><Plus className="h-4 w-4 mr-1" /> Add Event</Button>
+            <BulkUpload title="events" fields={[{ key: 'title', label: 'Title', required: true }, { key: 'date', label: 'Date', required: true }, { key: 'type', label: 'Type' }, { key: 'description', label: 'Description' }]} sampleRows={[{ title: 'Annual Sports Day', date: '2026-02-28', type: 'Event', description: 'School event' }]} onImport={importEvents} /><Button onClick={openNew} size="sm"><Plus className="h-4 w-4 mr-1" /> Add Event</Button>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -150,7 +173,7 @@ const EventsAwards = () => {
                 {uniqueAchievements.map(a => <SelectItem key={a} value={a}>{a}</SelectItem>)}
               </SelectContent>
             </Select>
-            <Button size="sm" onClick={() => setAwardSheetOpen(true)}><Plus className="h-4 w-4 mr-1" /> Add Participation</Button>
+            <BulkUpload title="awards" description="Event and student names must already exist in the system." fields={[{ key: 'event', label: 'Event', required: true }, { key: 'studentName', label: 'Student Name', required: true }, { key: 'category', label: 'Category' }, { key: 'achievement', label: 'Achievement' }, { key: 'status', label: 'Status' }]} sampleRows={[{ event: 'Annual Sports Day', studentName: 'Aarav Sharma', category: '100m Race', achievement: '1st Place', status: 'Awarded' }]} onImport={importAwards} /><Button size="sm" onClick={() => setAwardSheetOpen(true)}><Plus className="h-4 w-4 mr-1" /> Add Participation</Button>
           </div>
 
           <div className="rounded-lg border bg-card">
