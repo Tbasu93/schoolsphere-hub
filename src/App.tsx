@@ -21,6 +21,7 @@ import Routine from "./pages/Routine";
 import Items from "./pages/Items";
 import Certificates from "./pages/Certificates";
 import Houses from "./pages/Houses";
+import Reports from "./pages/Reports";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -50,6 +51,7 @@ const App = () => (
             <Route path="/items" element={<Items />} />
             <Route path="/certificates" element={<Certificates />} />
             <Route path="/houses" element={<Houses />} />
+            <Route path="/reports" element={<Reports />} />
           </Route>
           <Route path="*" element={<NotFound />} />
         </Routes>
