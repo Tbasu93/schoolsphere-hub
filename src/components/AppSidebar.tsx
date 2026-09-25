@@ -17,6 +17,7 @@ import {
   Package,
   Award,
   Home,
+  BarChart3,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import {
@@ -33,6 +34,7 @@ import {
 
 const mainNav = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard },
+  { title: "Reports", url: "/reports", icon: BarChart3 },
   { title: "Students", url: "/students", icon: GraduationCap },
   { title: "Teachers", url: "/teachers", icon: Users },
   { title: "Staff", url: "/staff", icon: UserCog },

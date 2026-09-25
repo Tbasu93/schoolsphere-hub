@@ -160,10 +160,38 @@ export interface RoutinePeriod {
 }
 
 export interface PromotionPolicy {
+  id?: string;
+  className?: string;
   compulsoryCategories: string[];
   passMarksPercent: number;
   passCriteria: 'all' | 'compulsory+3' | 'compulsory+4' | 'compulsory+5';
   examScope: 'annual' | 'all';
+  rules?: PromotionRule[];
+  sectionRules?: PromotionSectionRule[];
+}
+
+export interface PromotionRule {
+  id: string;
+  className: string;
+  compulsoryCategories: string[];
+  passMarksPercent: number;
+  passCriteria: PromotionPolicy['passCriteria'];
+  examScope: PromotionPolicy['examScope'];
+}
+
+export type PromotionConditionBasis = 'overall' | 'subject' | 'subjectsAverage' | 'exam';
+export type PromotionOperator = 'gte' | 'gt' | 'lte' | 'lt';
+
+export interface PromotionSectionRule {
+  id: string;
+  sourceClassName: string;
+  targetClassName: string;
+  targetSection: string;
+  basis: PromotionConditionBasis;
+  subjectNames: string[];
+  examId: string;
+  operator: PromotionOperator;
+  threshold: number;
 }
 
 // --- New interfaces for Batch C & D ---
@@ -208,11 +236,19 @@ export interface HouseConfig {
   names: string[];
 }
 
-const defaultPromotionPolicy: PromotionPolicy = {
+const defaultPromotionRule: PromotionRule = {
+  id: 'default-rule',
+  className: 'All Classes',
   compulsoryCategories: ['Core'],
   passMarksPercent: 40,
   passCriteria: 'compulsory+4',
   examScope: 'annual',
+};
+
+const defaultPromotionPolicy: PromotionPolicy = {
+  ...defaultPromotionRule,
+  rules: [defaultPromotionRule],
+  sectionRules: [],
 };
 
 const defaultHouseConfig: HouseConfig = {
@@ -324,6 +360,31 @@ function save<T>(key: string, data: T) {
   localStorage.setItem(`school_${key}`, JSON.stringify(data));
 }
 
+function normalizePromotionPolicy(policy: PromotionPolicy): PromotionPolicy {
+  const legacyRule: PromotionRule = {
+    id: policy.id || 'legacy-rule',
+    className: policy.className || 'All Classes',
+    compulsoryCategories: policy.compulsoryCategories || ['Core'],
+    passMarksPercent: policy.passMarksPercent ?? 40,
+    passCriteria: policy.passCriteria || 'compulsory+4',
+    examScope: policy.examScope || 'annual',
+  };
+  const rules = policy.rules?.length ? policy.rules : [legacyRule];
+  const firstRule = rules[0] || legacyRule;
+  return {
+    ...legacyRule,
+    ...policy,
+    id: policy.id || firstRule.id,
+    className: policy.className || firstRule.className,
+    compulsoryCategories: policy.compulsoryCategories || firstRule.compulsoryCategories,
+    passMarksPercent: policy.passMarksPercent ?? firstRule.passMarksPercent,
+    passCriteria: policy.passCriteria || firstRule.passCriteria,
+    examScope: policy.examScope || firstRule.examScope,
+    rules,
+    sectionRules: policy.sectionRules || [],
+  };
+}
+
 export const store = {
   getStudents: (): Student[] => load('students', sampleStudents),
   setStudents: (s: Student[]) => save('students', s),
@@ -361,7 +422,7 @@ export const store = {
   getRoutine: (): RoutinePeriod[] => load('routine', []),
   setRoutine: (r: RoutinePeriod[]) => save('routine', r),
 
-  getPromotionPolicy: (): PromotionPolicy => load('promotionPolicy', defaultPromotionPolicy),
+  getPromotionPolicy: (): PromotionPolicy => normalizePromotionPolicy(load('promotionPolicy', defaultPromotionPolicy)),
   setPromotionPolicy: (p: PromotionPolicy) => save('promotionPolicy', p),
 
   getEventParticipations: (): EventParticipation[] => load('eventParticipations', []),
